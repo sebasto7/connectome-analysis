@@ -6,7 +6,7 @@ USER PRE-REQUISITES:
 --------------------
 
 1. To have a google (e.g., gmail) account
-2. TO have high motivation and self-learning capabilities
+2. To have high motivation and self-learning capabilities
 3. To be open to do pair-coding
 
 COMPUTER INSTALLATIONS:
