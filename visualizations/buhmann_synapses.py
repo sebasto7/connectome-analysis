@@ -125,10 +125,15 @@ if __name__ == "__main__":
 
     synapses = client.materialize.synapse_query(
         pre_ids = int(pre_id), post_ids = int(post_id),
-        bounding_box_column='pre_pt_position')
+        bounding_box_column='pre_pt_position'
+        )
 
-    url = make_synapse_neuroglancer_link(synapses, client, point_column='pre_pt_position',return_as="url")
-    print(f"presinaptic terminals here: {url}")
+    url = make_synapse_neuroglancer_link(
+        synapses, client,
+        point_column='pre_pt_position',
+        link_pre_and_post=True, return_as="url"
+        )
+    print(f"Presinaptic terminals here: {url}")
 
     synapses_vectors = np.hstack(
         [np.vstack(synapses.pre_pt_position.values),
