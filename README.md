@@ -29,26 +29,31 @@ source C:/Users/[USERNAME]/anaconda3/Scripts/activate
 
 In any of those terminals, follow the commands:
 
-- conda create --name NeuPrint python=3.9
-- activate NeuPrint (-- FOR ACCESSIND DATA VIA NEUPRINT --)
+- conda create --name <env_name> python=3.9
+- activate <env_name> (-- FOR ACCESSIND DATA VIA NEUPRINT --)
 
-INSTALL PACKAGES
-- conda install -c flyem-forge neuprint-python
-- conda install pandas
-- conda install matplotlib
-- conda install seaborn
+INSTALL PACKAGES FOR DEALING WITH EM DATA SETS
+- pip install neuprint-python
+- pip install navis
+- pip install fafbseg
+
+CHECK IF THE FOLLOWING PACKAGES ARE INSTALLED, IF NOT, INTALL THEM
+- pip install numpy
+- pip install pandas
+- pip install matplotlib
+- pip install seaborn
 - (other packages might be needed)
 
-OPTIONAL PACKAGES
-- conda install -c conda-forge jupyterlab
+OPTIONAL RECOMENDED PACKAGES
+- pip install notebook (for Jupyter Notebooks)
 
 IMPORTANT CONSIDERATIONS
 - Since NeuPrint is working with a google account (Gmail or similar). If you are
 any jupyter notebook in the browser, it is better to use google chrome.
 For that, google chrome needs to be the default browser option in the computer.
 
-OPEN A JUPYTER NOTEBOOK in JUPYTER LAB
-- Typer "jupyter-lab" in the NeuPrint environment prompt
+OPEN A JUPYTER NOTEBOOK
+- Typer "jupyter notebook" in the <env_name> environment prompt
 - Look for the notebook file (.ipynb) and open it
 
 OPTIONALLY, OTHER TEXT EDITORS CAN BE USED THAT HANDLE COMPLEX FILE TYPES:
