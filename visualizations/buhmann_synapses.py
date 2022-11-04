@@ -43,6 +43,7 @@ if __name__ == "__main__":
     pre_id = client.chunkedgraph.get_latest_roots(pre_id).tolist()
     post_id = client.chunkedgraph.get_latest_roots(post_id).tolist()
     new_segmentsIDs_ls = [x for y in zip(pre_id, post_id) for x in y] #Combining lists of equal size
+    print(f'Update ids, pre: {pre_id}, post: {post_id}')
 
     if method == "FAFB":
 
@@ -51,6 +52,10 @@ if __name__ == "__main__":
                         min_score=50, clean=True, transmitters=False,
                         neuropils=True, batch_size=30,
                         dataset='production', progress=True,mat="live")
+
+        # TODO: implement code in case the "pre_id"  is a list of more than one item.
+        # This happens when a segment ID is split in two or more.
+        # Check for each of the new segemnt IDs, which is the one in contact with the "post_id"
 
         synapses = synapses[synapses['pre'] == pre_id[0]]
         #Combining x,y,z columns for future purposes
