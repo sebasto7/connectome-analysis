@@ -62,7 +62,7 @@ if __name__ == "__main__":
         combine_xyz(synapses)
         # Getting URL
         url = make_synapse_neuroglancer_link(synapses, client,
-                point_column='pre_pt_position',return_as="url")
+                point_column='post_pt_position',return_as="url")
 
     elif method == "CAVE":
 
@@ -72,7 +72,7 @@ if __name__ == "__main__":
 
         url = make_synapse_neuroglancer_link(
             synapses, client,
-            point_column='pre_pt_position',
+            point_column='post_pt_position',
             link_pre_and_post=True, return_as="url")
 
     print(f"Site are here as annotations: {url}")
