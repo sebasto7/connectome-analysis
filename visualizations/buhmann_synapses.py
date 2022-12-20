@@ -77,9 +77,9 @@ if __name__ == "__main__":
 
     print(f"Site are here as annotations: {url}")
 
-    # Linking pre and post sites:
-    synapses_vectors = np.hstack(
-        [np.vstack(synapses.pre_pt_position.values),
-        np.vstack(synapses.post_pt_position.values)])
-
-    json_dict = to_ng_annotations(synapses_vectors, input_order='xyz', voxel_mip_center=1, input_units=(4,4,40))
+    # # Linking pre and post sites:
+    # synapses_vectors = np.hstack(
+    #     [np.vstack(synapses.pre_pt_position.values),
+    #     np.vstack(synapses.post_pt_position.values)])
+    #
+    # json_dict = to_ng_annotations(synapses_vectors, input_order='xyz', voxel_mip_center=1, input_units=(4,4,40))
