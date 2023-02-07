@@ -8,6 +8,7 @@ Created on Wed Oct  6 08:50:02 2021
 from collections import defaultdict
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import matplotlib.pyplot as plt
 import networkx as nx
 from matplotlib.ticker import PercentFormatter
@@ -423,8 +424,8 @@ def direct_indirect_connections_analysis(Weights,user_parameters):
         length_dict[neuron] = temp_total_length_list
         norm_length_dict[neuron] = temp_total_norm_length_list
 
-        print('Direct and indirect connections analysis done.')
-        return number_partners_dict, length_dict, norm_length_dict
+    print('Direct and indirect connections analysis done.')
+    return number_partners_dict, length_dict, norm_length_dict
     
 def input_output_analysis(Weights,user_parameters):
     '''
@@ -511,7 +512,352 @@ def input_output_analysis(Weights,user_parameters):
             final_output_ranked_norm_df.at[neuron, column] = (final_output_ranked_norm_df.loc[neuron, column]/sum_df[neuron])
     
     print('Input-Ouput analysis done.')
-    return final_input_output_dict, final_input_df, final_output_df, final_input_ranked_df, final_output_ranked_df
+    return final_input_output_dict, final_input_df, final_output_df, final_input_ranked_df, final_output_ranked_df,final_input_ranked_norm_df,final_output_ranked_norm_df
             
-    
+
+def autolabel(ax, variable, ascending = True):
+        '''
         
+        '''
+        rects = ax.patches
+        if not ascending:
+            variable = variable.sort_values(ascending = False)
+            variable = variable.to_list()
+        for i, rect in enumerate(rects):
+            height = rect.get_height()
+            percent = f'{variable[i]} %'
+            ax.text(rect.get_x() + rect.get_width() / 2., 0.2 * height,
+                    percent,
+                    ha='center', va='bottom', rotation=90, color='k')
+    
+def input_output_plot(node_of_interest,final_input_output_dict,final_input_df,final_output_df,final_input_ranked_df,final_output_ranked_df,final_input_ranked_norm_df,final_output_ranked_norm_df,user_parameters):
+
+    '''
+    
+    '''
+    
+    ####################### Bar plots with seaborn  ######################
+    # Input and output absolute number of connections (bar) and in percentatge as text
+
+    #Getting the data for the node_of_interest
+    input_df = final_input_output_dict[node_of_interest]['input_neurons']
+    output_df = final_input_output_dict[node_of_interest]['output_neurons']
+
+    input_percentatge = (input_df['Inputs']/sum(input_df['Inputs']))*100
+    input_df['Percentage'] = input_percentatge
+    input_df['Percentage']= input_df['Percentage'].round(2)
+    output_percentatge = (output_df['Outputs']/sum(output_df['Outputs']))*100
+    output_df['Percentage'] = output_percentatge
+    output_df['Percentage']= output_df['Percentage'].round(2)
+
+    #Bar plots with seaborn
+    fig, axes = plt.subplots(nrows= 2,ncols=1,figsize=(30*cm, 20*cm)) # All together
+    cur_df = input_df
+    _color = 'blue'
+    sns.barplot(ax = axes[0],x = 'Neuron', y = 'Inputs', data = cur_df, order=cur_df.sort_values('Inputs',ascending = False).Neuron,
+                color=_color)
+
+    axes[0].set_xticklabels(cur_df.sort_values('Inputs',ascending = False).Neuron.tolist(), rotation = 90, fontsize = 7)
+    axes[0].spines['right'].set_visible(False)
+    axes[0].spines['top'].set_visible(False)
+    autolabel(axes[0],cur_df['Percentage'],ascending = False)
+
+
+    cur_df = output_df
+    _color = 'green'
+    sns.barplot(ax = axes[1],x = 'Neuron', y = 'Outputs', data = cur_df, order=cur_df.sort_values('Outputs',ascending = False).Neuron,
+                color=_color)
+    axes[1].set_xticklabels(cur_df.sort_values('Outputs',ascending = False).Neuron.tolist(), rotation = 90, fontsize = 7)       
+    axes[1].spines['right'].set_visible(False)
+    axes[1].spines['top'].set_visible(False)
+    autolabel(axes[1],cur_df['Percentage'],ascending = False)
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' - '+ user_parameters['node_of_interest']
+    fig.suptitle(_title, fontsize = 12)
+
+
+    #################### Stacked bar plot with pandas  ###################
+    # Inputs and outputs synapses per neuron type
+    _fontsize = 6
+    fig_s, axes_s = plt.subplots(nrows= 1,ncols=2,figsize=(20*cm, 10*cm)) # All together
+
+    weigth_df_bar = final_input_df
+    #weigth_df_bar= weigth_df_bar.fillna(0)
+    weigth_df_bar.plot(ax=axes_s[0],kind='bar', stacked=True, fontsize = _fontsize)
+    weigth_df_bar = final_output_df
+    #weigth_df_bar= weigth_df_bar.fillna(0)
+    weigth_df_bar.plot(ax=axes_s[1],kind='bar', stacked=True, fontsize = _fontsize)
+
+
+    axes_s[0].set_ylabel('Input synapses per neuron type', fontsize = 12)
+    axes_s[1].set_ylabel('Output synapses per neuron type', fontsize = 12)
+
+    axes_s[0].spines['right'].set_visible(False)
+    axes_s[1].spines['right'].set_visible(False)
+    axes_s[0].spines['top'].set_visible(False)
+    axes_s[1].spines['top'].set_visible(False)
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' by synaptic partner'
+    fig_s.suptitle(_title, fontsize = 12)
+
+
+    #################### Stacked bar plot with pandas  ###################
+    #Inputs and outputs synapses per neuron, RANKED, first "N" connections
+    
+    N = 20
+    # Sixth barplot
+    _fontsize = 6
+    fig_r, axes_r = plt.subplots(nrows= 1,ncols=2,figsize=(20*cm, 10*cm)) # All together
+
+    weigth_df_bar = final_input_ranked_df.iloc[: , :N]
+    weigth_df_bar.plot(ax=axes_r[0],kind='bar', stacked=True, fontsize = _fontsize)
+    weigth_df_bar = final_output_ranked_df.iloc[: , :N]
+    weigth_df_bar.plot(ax=axes_r[1],kind='bar', stacked=True, fontsize = _fontsize)
+
+
+    axes_r[0].set_ylabel('Input synapses, ranked', fontsize = 12)
+    axes_r[1].set_ylabel('Output synapses, ranked', fontsize = 12)
+
+    axes_r[0].spines['right'].set_visible(False)
+    axes_r[1].spines['right'].set_visible(False)
+    axes_r[0].spines['top'].set_visible(False)
+    axes_r[1].spines['top'].set_visible(False)
+
+    axes_r[0].get_legend().remove()
+    axes_r[1].get_legend().remove()
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' by connection number'
+    fig_r.suptitle(_title, fontsize = 12)
+
+
+    #################### Stacked bar plot with pandas  ###################
+    #Normalized to the sum of input. Input-output FRACTIONS
+
+    # Seventh barplot
+    fig_f, axes_f = plt.subplots(nrows= 1,ncols=2,figsize=(20*cm, 10*cm)) # All together
+    _fontsize = 6
+
+    weigth_df_bar = final_input_ranked_norm_df.iloc[: , :N]
+    weigth_df_bar.plot(ax=axes_f[0],kind='bar', stacked=True, fontsize = _fontsize)
+    weigth_df_bar = final_output_ranked_norm_df.iloc[: , :N]
+    weigth_df_bar.plot(ax=axes_f[1],kind='bar', stacked=True, fontsize = _fontsize)
+
+
+    axes_f[0].set_ylabel('Fraction of input synapses', fontsize = 12)
+    axes_f[1].set_ylabel('Fraction of output synapses', fontsize = 12)
+
+    axes_f[0].spines['right'].set_visible(False)
+    axes_f[1].spines['right'].set_visible(False)
+    axes_f[0].spines['top'].set_visible(False)
+    axes_f[1].spines['top'].set_visible(False)
+
+    axes_f[0].get_legend().remove()
+    axes_f[1].get_legend().remove()
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' FRACTIONS'
+    fig_f.suptitle(_title, fontsize = 12)
+
+
+    ############################ Line plots with pandas######################
+    # First "N" connections in absolute numbers
+    # TODO: add relative quantification as well and measure slopes fitting and exponential curve
+
+    N = 7
+
+    #Firt line plot
+    fig_l, axes_l = plt.subplots(nrows= 1,ncols=2,figsize=(20*cm, 10*cm)) # All together
+    _fontsize = 6
+    weigth_line_df= final_input_ranked_norm_df.fillna(0)
+    weigth_line_df=weigth_line_df.loc[user_parameters['node_of_interest']].iloc[:N]
+    weigth_line_df.T.plot(ax=axes_l[0])
+
+    weigth_line_df= final_output_ranked_norm_df.fillna(0)
+    weigth_line_df=weigth_line_df.loc[user_parameters['node_of_interest']].iloc[:N]
+    weigth_line_df.T.plot(ax=axes_l[1])
+
+    axes_l[0].set_ylabel('Fraction of input synapses', fontsize = _fontsize)
+    axes_l[1].set_ylabel('Fraction of output synapses', fontsize = _fontsize)
+
+    axes_l[0].spines['right'].set_visible(False)
+    axes_l[1].spines['right'].set_visible(False)
+    axes_l[0].spines['top'].set_visible(False)
+    axes_l[1].spines['top'].set_visible(False)
+    axes_l[0].set_ylim(0,1)
+    axes_l[1].set_ylim(0,1)
+
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ': ' + user_parameters['node_of_interest'] +' FRACTIONS'
+    fig_l.suptitle(_title, fontsize = 12)
+
+    return fig, fig_s, fig_r, fig_f, fig_l
+        
+def direct_indirect_connections_plot(number_partners_dict,length_dict,norm_length_dict,user_parameters):
+    '''
+    
+    '''
+    #Pandas dataframes creation
+    variable_partners = '# of Partners'
+    partners_df = pd.DataFrame(number_partners_dict)
+    partners_df  = partners_df .T
+    partners_df.columns =['Direct', 'Indirect 1', 'Indirect 2']
+    partners_df= partners_df.stack().reset_index()
+    partners_df.rename(columns = {'level_0':'Neuron'}, inplace = True)
+    partners_df.rename(columns = {'level_1':'Connection'}, inplace = True)
+    partners_df.rename(columns = {0:variable_partners}, inplace = True)
+
+    variable_weigth = 'Weigth'
+    weigth_df = pd.DataFrame(length_dict)
+    weigth_df  = weigth_df .T
+    weigth_df.columns =['Direct', 'Indirect 1', 'Indirect 2']
+    weigth_df= weigth_df.stack().reset_index()
+    weigth_df.rename(columns = {'level_0':'Neuron'}, inplace = True)
+    weigth_df.rename(columns = {'level_1':'Connection'}, inplace = True)
+    weigth_df.rename(columns = {0:variable_weigth}, inplace = True)
+
+    variable = 'Norm weigth'
+    df = pd.DataFrame(norm_length_dict)
+    df  = df .T
+    df.columns =['Direct', 'Indirect 1', 'Indirect 2']
+    df= df.stack().reset_index()
+    df.rename(columns = {'level_0':'Neuron'}, inplace = True)
+    df.rename(columns = {'level_1':'Connection'}, inplace = True)
+    df.rename(columns = {0:variable}, inplace = True)
+
+    #Bar plots with seaborn
+    fig, axes = plt.subplots(nrows= 3,ncols=2,figsize=(20*cm, 30*cm)) # All together
+    _fontsize = 6
+
+    cur_df = weigth_df.loc[weigth_df['Connection']== 'Direct']
+    _color = 'blue'
+    sns.barplot(ax = axes[0,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=cur_df.sort_values(variable_weigth,ascending = False).Neuron,
+                color=_color)
+    axes[0,0].set_xticklabels(cur_df.sort_values(variable_weigth,ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+    cur_df = partners_df.loc[partners_df['Connection']== 'Direct']
+    _color = 'blue'
+    sns.barplot(ax = axes[0,1],x = 'Neuron', y = variable_partners, data = cur_df, order=cur_df.sort_values(variable_partners,ascending = False).Neuron,
+                color=_color)
+    axes[0,1].set_xticklabels(cur_df.sort_values(variable_partners,ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+    cur_df = weigth_df.loc[weigth_df['Connection']== 'Indirect 1']
+
+    _color = 'orange'
+    sns.barplot(ax = axes[1,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=cur_df.sort_values(variable_weigth,ascending = False).Neuron,
+                color=_color)
+    axes[1,0].set_xticklabels(cur_df.sort_values(variable_weigth,ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+    cur_df = partners_df.loc[partners_df['Connection']== 'Indirect 1']
+    _color = 'orange'
+    sns.barplot(ax = axes[1,1],x = 'Neuron', y = variable_partners, data = cur_df, order=cur_df.sort_values(variable_partners,ascending = False).Neuron,
+                color=_color)
+    axes[1,1].set_xticklabels(cur_df.sort_values(variable_partners,ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+    cur_df = weigth_df.loc[weigth_df['Connection']== 'Indirect 2']
+    _color = 'green'
+    sns.barplot(ax = axes[2,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=cur_df.sort_values(variable_weigth,ascending = False).Neuron,
+                color=_color)
+    axes[2,0].set_xticklabels(cur_df.sort_values(variable_weigth,ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+    cur_df = partners_df.loc[partners_df['Connection']== 'Indirect 2']
+    _color = 'green'
+    sns.barplot(ax = axes[2,1],x = 'Neuron', y = variable_partners, data = cur_df, order=cur_df.sort_values(variable_partners,ascending = False).Neuron,
+                color=_color)
+
+    axes[2,1].set_xticklabels(cur_df.sort_values(variable_partners,ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+    axes[0,0].set_ylabel('Synaptic count', fontsize = 8)
+    axes[0,1].set_ylabel('Partners', fontsize = 8)
+    axes[1,0].set_ylabel('Synaptic count', fontsize = 8)
+    axes[1,1].set_ylabel('Partners', fontsize = 8)
+    axes[2,0].set_ylabel('Synaptic count', fontsize = 8)
+    axes[2,1].set_ylabel('Partners', fontsize = 8)
+
+    axes[0,0].spines['right'].set_visible(False)
+    axes[0,1].spines['right'].set_visible(False)
+    axes[1,0].spines['right'].set_visible(False)
+    axes[1,1].spines['right'].set_visible(False)
+    axes[2,0].spines['right'].set_visible(False)
+    axes[2,1].spines['right'].set_visible(False)
+    axes[0,0].spines['top'].set_visible(False)
+    axes[0,1].spines['top'].set_visible(False)
+    axes[1,0].spines['top'].set_visible(False)
+    axes[1,1].spines['top'].set_visible(False)
+    axes[2,0].spines['top'].set_visible(False)
+    axes[2,1].spines['top'].set_visible(False)
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' - Direct- , - Indirect 1 - and -Indirect 2- connections'
+    fig.suptitle(_title, fontsize = 12)
+
+    # Stacked bar plot with pandas
+    fig_s, axes_s = plt.subplots(nrows= 1,ncols=2,figsize=(20*cm, 10*cm)) # All together
+
+    weigth_df_bar = weigth_df.groupby(['Neuron','Connection'])[variable_weigth].sum().unstack().fillna(0)
+    weigth_df_bar.reindex(user_parameters['defined_microcirtuit']).plot(ax=axes_s[0],kind='bar', stacked=True)
+    partners_df_bar = partners_df.groupby(['Neuron','Connection'])[variable_partners].sum().unstack().fillna(0)
+    partners_df_bar.reindex(user_parameters['defined_microcirtuit']).plot(ax=axes_s[1],kind='bar', stacked=True)
+
+    axes_s[0].set_ylabel('Synaptic count', fontsize = 8)
+    axes_s[1].set_ylabel('Partners', fontsize = 8)
+
+    axes_s[0].spines['right'].set_visible(False)
+    axes_s[1].spines['right'].set_visible(False)
+    axes_s[0].spines['top'].set_visible(False)
+    axes_s[1].spines['top'].set_visible(False)
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column']
+    fig_s.suptitle(_title, fontsize = 12)
+
+    return fig, fig_s
+
+
+def centrality_plot(centrality_df,user_parameters):#
+    '''
+    
+    '''
+
+    # Barplots using seaborn
+    fig, axes = plt.subplots(nrows= 2,ncols=2,figsize=(20*cm, 20*cm)) # All together
+    _fontsize = 6
+
+    cur_df = centrality_df
+
+    _color = 'tomato'
+    sns.barplot(ax = axes[0,0],x = 'Neuron', y = 'Degree', data = cur_df, order=cur_df.sort_values('Degree',ascending = False).Neuron,
+                color=_color)
+    axes[0,0].set_xticklabels(cur_df.sort_values('Degree',ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+
+    _color = 'purple'
+    sns.barplot(ax = axes[0,1],x = 'Neuron', y = 'Pagerank eigenvector', data = cur_df, order=cur_df.sort_values('Pagerank eigenvector',ascending = False).Neuron,
+                color=_color)
+    axes[0,1].set_xticklabels(cur_df.sort_values('Pagerank eigenvector',ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+
+    _color = 'teal'
+    sns.barplot(ax = axes[1,0],x = 'Neuron', y = 'Betweenness', data = cur_df, order=cur_df.sort_values('Betweenness',ascending = False).Neuron,
+                color=_color)
+    axes[1,0].set_xticklabels(cur_df.sort_values('Betweenness',ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+
+    _color = 'gold'
+    sns.barplot(ax = axes[1,1],x = 'Neuron', y = 'Closeness', data = cur_df, order=cur_df.sort_values('Closeness',ascending = False).Neuron,
+                color=_color)
+    axes[1,1].set_xticklabels(cur_df.sort_values('Closeness',ascending = False).Neuron.tolist(), rotation = 90, fontsize = _fontsize)
+
+
+    axes[0,0].spines['right'].set_visible(False)
+    axes[0,1].spines['right'].set_visible(False)
+    axes[1,0].spines['right'].set_visible(False)
+    axes[1,1].spines['right'].set_visible(False)
+    axes[0,0].spines['top'].set_visible(False)
+    axes[0,1].spines['top'].set_visible(False)
+    axes[1,0].spines['top'].set_visible(False)
+    axes[1,1].spines['top'].set_visible(False)
+
+
+    _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' Centrality measures'
+    fig.suptitle(_title, fontsize = 12)
+
+    #plt.show()
+    #plt.close()
+    return fig
