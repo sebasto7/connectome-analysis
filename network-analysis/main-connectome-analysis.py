@@ -28,18 +28,18 @@ from core_functions_general import saveWorkspace
 #%% User parameters in a dictionary
 user_parameters = {}
 user_parameters['dataPath']= r'D:\Connectomics-Data\datasets\NeuPrint\fib25'
-user_parameters['file']='home_column_fib25.csv'#dataset file
-user_parameters['column']='home column' #
+user_parameters['file']='F_column_fib25.csv'#dataset file
+user_parameters['column']='F-column' #
 user_parameters['graph']= 'Fib25_data_7medulla_columns'
 user_parameters['aggregate']= False # For merging nodes with the same begginning of name of length = aggregate_ii
 user_parameters['aggregate_ii']=4
 user_parameters['start_node']= 'L3' # string of lenght = aggregate_ii
-user_parameters['last_node']= 'Tm9'  # string of lenght = aggregate_ii
-user_parameters['node_of_interest']= 'Tm9'  # for input-output plotting
-user_parameters['_cutoff']=3 # max num of neurons between start and last node
+user_parameters['last_node']= 'Tm1'  # string of lenght = aggregate_ii
+user_parameters['node_of_interest']= 'Tm1'  # for input-output plotting
+user_parameters['_cutoff']=3 # max num of neurons between start and last node for path calculations, check "node_to_node_graph_analysis_and_plot"
 user_parameters['neurons_to_exclude']= ['L1','L2','L3','T4a','T4b','T4c','T4d'] # exclude from centrality analysis and SSSP Analysis, not from the graph
 user_parameters['multiple_start_nodes']= ['L1','L2','L3']
-user_parameters['synaptic_stength_filter'] = 0
+user_parameters['synaptic_stength_filter'] = 2 # connection number lower than this number will be discarded
 user_parameters['defined_microcirtuit'] = ['Tm1','Tm2','Tm4','Tm9','CT1','C3', 'C2', 'T1'] # Used so far only for the stacked bar plot in "direct_indirect_connections_plot"
 
 
@@ -58,9 +58,7 @@ cm = 1/2.54  # centimeters in inches
 dirPath = os.path.join(main_data_folder, user_parameters['column'], user_parameters['graph'])
 if not os.path.exists(dirPath):
     os.makedirs(dirPath)
-main_processed_data_folder = os.path.join(main_data_folder,'Processed data all',user_parameters['graph'])
-
-
+main_processed_data_folder = os.path.join(main_data_folder,'processed-data',user_parameters['graph'])
 
 
 # Loading the data of the circuit graph - from csv file
@@ -149,22 +147,24 @@ G_plot.add_edges_from(edges_plot)
 fig_graph = graph_plot(Weights, user_parameters, 'none')
 
 
-#%% Single source shortest path  (SSSP) analysis
-# with NetwrokX
-length, path = nx.single_source_dijkstra(G, user_parameters['start_node'])
+#%% Single source shortest path  (SSSP) analysis with NetwrokX
 
-path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items())
-message_str = '\n >>>>>>> All paths: \n\n%s can reach a neuron via [shortest path]: \n\n%s ' % (user_parameters['start_node'], path_str)
-print(message_str)
+# >>> Relevant message: currently not interesting to print it out, moving to show it in a different way. Therefore is all commented out
 
-path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items() if k == user_parameters['last_node'])
-message_str = '\n >>>>>>> Single path: \n\n%s can reach %s via [shortest path]: \n\n%s ' % (user_parameters['start_node'],user_parameters['last_node'], path_str)
-print(message_str)
+# length, path = nx.single_source_dijkstra(G, user_parameters['start_node'])
+
+# path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items())
+# message_str = '\n >>>>>>> All paths: \n\n%s can reach a neuron via [shortest path]: \n\n%s ' % (user_parameters['start_node'], path_str)
+# print(message_str)
+
+# path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items() if k == user_parameters['last_node'])
+# message_str = '\n >>>>>>> Single path: \n\n%s can reach %s via [shortest path]: \n\n%s ' % (user_parameters['start_node'],user_parameters['last_node'], path_str)
+# print(message_str)
 
 
 #%% Node to node analysis
 #Highlights specific paths in the graph between two nodes and save a dataFrame with all the paths
-path_df = node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,save_figures,plot_node_to_tode_paths)    
+path_df = node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,save_figures,plot_node_to_tode_paths=False)    
 
 #%% Centrality measures analysis
 #Currently extracting: closeness_centrality, betweenness_centrality, degree_centrality, and eigenvector_centrality
@@ -202,23 +202,22 @@ if save_figures:
     input_output_fig.savefig(save_dir+'Inputs and outputs - %s %s %s .pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
     input_output_fractions_fig.savefig(save_dir+'Inputs and outputs - FRACTION  %s %s .pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
     input_output_line_fig.savefig(save_dir+'Inputs and outputs FRACTION - %s %s %s .pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-
-    print('\nFigures saved\n')
+    print('\nFigures saved.\n')
     
 if save_data:
     os.chdir(main_data_folder) # Seb: X_save_vars.txt file needs to be there    
     varDict = locals()
     pckl_save_name = ('%s' % user_parameters['column'])
-    saveOutputDir = dirPath+ '\\processed data\\' 
+    saveOutputDir = dirPath+ '\\processed-data\\' 
     if not os.path.exists(saveOutputDir): # Seb: creating processed data folder
         os.mkdir(saveOutputDir) 
     saveWorkspace(saveOutputDir,pckl_save_name, varDict,
                   varFile='main_connectome_analysis_save_vars.txt',extension='.pickle')
     if not os.path.exists(main_processed_data_folder):
-        os.mkdir(main_processed_data_folder) # Seb: creating folder for storing all data per stim type
+        os.makedirs(main_processed_data_folder) # Seb: creating folder for storing all data per stim type
     saveWorkspace(main_processed_data_folder,pckl_save_name, varDict, 
                     varFile='main_connectome_analysis_save_vars.txt',extension='.pickle')
         
-    print('\n\n%s processed data saved...\n\n' % pckl_save_name)
+    print('\n\n%s processed-data saved.\n\n' % pckl_save_name)
 
     

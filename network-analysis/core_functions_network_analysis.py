@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from matplotlib.ticker import PercentFormatter
 import os
+import math 
 
 # General variables
 cm = 1/2.54  # centimeters in inches
@@ -259,31 +260,31 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
     
     '''
 
-    message_str = '\n >>>>>>> All paths in a distance of max %d neurons' % (user_parameters['_cutoff'])
-    print(message_str)
+    #message_str = '\n >>>>>>> All paths in a distance of max %d neurons' % (user_parameters['_cutoff'])
+    #print(message_str)
     multiple_path_dict = {} #For multiple start nodes to last node
-    for node in user_parameters['multiple_start_nodes']:
-        start_node = node
-        path_list = [] # For single start node to last node
-        for path in nx.all_simple_paths(G, source=start_node , target=user_parameters['last_node'], cutoff=user_parameters['_cutoff']):
-            path_list.append(path)
-            print(path)
-        _key = node+'_'+user_parameters['last_node']
-        multiple_path_dict[_key] = path_list
+
+    for last_node in user_parameters['neuron_list']:
+
+        for start_node in user_parameters['neuron_list']: # in user_parameters['multiple_start_nodes']
+            path_list = [] # For single start node to last node
+            for path in nx.all_simple_paths(G, source=start_node , target=last_node, cutoff=user_parameters['_cutoff']):
+                path_list.append(path)
+                #print(path)
+            _key = start_node+'_'+last_node
+            multiple_path_dict[_key] = path_list
 
     path_df = pd.DataFrame(columns =['Node_to_node' ,'Path', 'Weigth'])
     for key, value in multiple_path_dict.items():
+        if value == []: # If there are no connections, continue with the next path
+            continue
         node_to_lode_list = [key]*len(value)
         path_list = value
         path_weigth_list = []
         for cur_path in path_list:
             
-            
-            # Get position using spring layout
-            pos = nx.circular_layout(G)
-            
             # Get shortest path
-            highlighted_path = nx.shortest_path(G,source=user_parameters['start_node'],target=user_parameters['last_node'])
+            #highlighted_path = nx.shortest_path(G,source=user_parameters['start_node'],target=user_parameters['last_node'])
             highlighted_path = cur_path
             
             temp_weigth  = 0
@@ -291,8 +292,10 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
                 temp_weigth = temp_weigth +(Weights[(highlighted_path[i],highlighted_path[i+1])])
             weigth_path = round(temp_weigth/(len(highlighted_path)-1))
             path_weigth_list.append(weigth_path)
+
+        
             
-            
+            # Optional plotting
             if plot_node_to_tode_paths:
                 
                 path_fig,axes= plt.subplots(figsize=(20*cm, 20*cm))
@@ -307,6 +310,9 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
                     _color = 'r'
                     
                 path_edges = list(zip(highlighted_path,highlighted_path[1:]))
+
+                # Get position using spring layout
+                pos = nx.circular_layout(G)
                 
                 # Draw nodes and edges not included in path
                 nx.draw_networkx_nodes(G, pos, nodelist=set(G.nodes)-set(highlighted_path),node_size=600)
@@ -334,14 +340,16 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
                         path_fig.savefig(save_dir+'weigth %.1f path %s-%s-%s %s %s.pdf' % (weigth_path,user_parameters['start_node'],highlighted_path[1],user_parameters['last_node'],user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")       
                     elif len(highlighted_path) == 4:
                         path_fig.savefig(save_dir+'weigth %.1f path %s-%s-%s-%s %s %s.pdf' % (weigth_path,user_parameters['start_node'],highlighted_path[1],highlighted_path[2],user_parameters['last_node'],user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-                    
+                
             # Creating paths dataframe
             cur_df = pd.DataFrame(list(zip(node_to_lode_list,path_list, path_weigth_list)),
-                    columns =['Node_to_node' ,'Path', 'Weigth'])
-            # Concatenating dataframes    
-            path_df = path_df.append(cur_df)
-        print('Node to node path analysis done.')
-        return path_df
+                   columns =['Node_to_node' ,'Path', 'Weigth'])
+        # Concatenating dataframes    
+        path_df = path_df.append(cur_df)
+                    
+            
+    print('Node to node path analysis done.')
+    return path_df
 
 def centrality_analysis(G,user_parameters):
     '''
@@ -432,6 +440,11 @@ def input_output_analysis(Weights,user_parameters):
     Input- ouput analysis
     Edges considered to as the number of connections (x) and not the reciprocal (1/x)
 
+
+    - final_input_df: e.g. final_input_df.loc['Mi1']['L1'] shows inputs to Mi1 (post) from L1 (pre) (the indxed of the dataframe is the neuron of interest, "inpust to")
+    - final_output_df: e.g. final_output_df.loc['Mi1']['L1'] shows outputs from Mi1 (pre) to L1 (post) (the indxed of the dataframe is the neuron of interest, "outputs from")
+    - final_input_ranked_df: neuron identity lost here, since we care about 1st, 2nd, 3rd, etc, inputs based on high contacts numbers.
+    - final_input_ranked_norm_df: same as the one above but all connections for an specific neuron sum to 1.
     '''
 
     edges = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()] 
@@ -861,3 +874,100 @@ def centrality_plot(centrality_df,user_parameters):#
     #plt.show()
     #plt.close()
     return fig
+
+def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
+    '''
+    Plotting of a heatmap to visualize input/output variability variability
+
+    df: pandas dataframe where the index is the neuron of interest (inputs to, outputs from) and the columns are the pre- or postsynaptic partners
+    data_name: str that specifie what is in the dataframe (e.g., inputs or outputs)
+    list_of_neurons: lit of strings of neuron names. Subpots organized in 3 columns
+
+    '''
+    #Color palettes
+    _palette = sns.color_palette("viridis", as_cmap=True)
+    _palette = sns.color_palette("inferno")
+    _palette = sns.color_palette("rocket")
+
+    #First figure, absolute connection counts
+
+    ncols = 3
+    nrows = math.ceil(len(list_of_neurons) / ncols)
+    fig, axes = plt.subplots(nrows,ncols,figsize=(ncols*10*cm, nrows*10*cm)) # All together 
+    fig.tight_layout(pad=8) # Adding some space between subplots
+    
+    _title = f"{user_parameters['graph']}: {user_parameters['column']} {data_name}-Heatmap"
+    fig.suptitle(_title, fontsize = 12)
+
+    n = 0
+    for i in range(nrows):
+        for j in range(ncols):
+            if len(list_of_neurons) == n:
+                break
+            else:
+                neuron = list_of_neurons[n]
+                sns.heatmap(cmap=_palette,ax = axes[i,j],data = df.loc[neuron].dropna(axis='columns', how ='all')) # we drop columns if they only have NaN values
+                axes[i,j].tick_params(axis='x', labelrotation=90)
+                axes[i,j].set_xlabel(f'{data_name} neuron')
+                axes[i,j].set_ylabel(f'Columns')
+                axes[i,j].set_yticklabels(short_col_names)
+                axes[i,j].set_title(f'{neuron}')
+
+            n += 1
+
+    #Second figure, connections normalized to the maximum count (per each row)
+
+    df_max = df.div(df.max(axis=1), axis=0).copy() # Normalization in one line
+    ncols = 3
+    nrows = math.ceil(len(list_of_neurons) / ncols)
+    fig_max, axes_max = plt.subplots(nrows,ncols,figsize=(ncols*10*cm, nrows*10*cm)) # All together 
+    fig_max.tight_layout(pad=8) # Adding some space between subplots
+    
+    _title = f"{user_parameters['graph']}: {user_parameters['column']} {data_name}-Heatmap Normalized to max"
+    fig_max.suptitle(_title, fontsize = 12)
+
+    n = 0
+    for i in range(nrows):
+        for j in range(ncols):
+            if len(list_of_neurons) == n:
+                break
+            else:
+                neuron = list_of_neurons[n]
+                sns.heatmap(cmap=_palette,ax = axes_max[i,j],data = df_max.loc[neuron].dropna(axis='columns', how ='all')) # we drop columns if they only have NaN values
+                axes_max[i,j].tick_params(axis='x', labelrotation=90)
+                axes_max[i,j].set_xlabel(f'{data_name} neuron')
+                axes_max[i,j].set_ylabel(f'Columns')
+                axes_max[i,j].set_yticklabels(short_col_names)
+                axes_max[i,j].set_title(f'{neuron}')
+
+            n += 1
+
+    #Third figure, connections normalized to the sum of count (per each row)
+
+    df_sum = df.div(df.sum(axis=1), axis=0).copy() # Normalization in one line
+    ncols = 3
+    nrows = math.ceil(len(list_of_neurons) / ncols)
+    fig_sum, axes_sum = plt.subplots(nrows,ncols,figsize=(ncols*10*cm, nrows*10*cm)) # All together 
+    fig_sum.tight_layout(pad=8) # Adding some space between subplots
+    
+    _title = f"{user_parameters['graph']}: {user_parameters['column']} {data_name}-Heatmap Normalized to sum"
+    fig_sum.suptitle(_title, fontsize = 12)
+
+    n = 0
+    for i in range(nrows):
+        for j in range(ncols):
+            if len(list_of_neurons) == n:
+                break
+            else:
+                neuron = list_of_neurons[n]
+                sns.heatmap(cmap=_palette,ax = axes_sum[i,j],data = df_sum.loc[neuron].dropna(axis='columns', how ='all')) # we drop columns if they only have NaN values
+                axes_sum[i,j].tick_params(axis='x', labelrotation=90)
+                axes_sum[i,j].set_xlabel(f'{data_name} neuron')
+                axes_sum[i,j].set_ylabel(f'Columns')
+                axes_sum[i,j].set_yticklabels(short_col_names)
+                axes_sum[i,j].set_title(f'{neuron}')
+
+            n += 1
+
+    return fig, fig_max, fig_sum
+

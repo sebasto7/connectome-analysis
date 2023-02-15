@@ -102,7 +102,8 @@ def saveWorkspace(outDir, baseName, varDict, varFile='workspaceVar.txt',
     # it is safer to get the variables from a txt
     # otherwise the actual session might have some variables
     # @TODO make workspaceFl path not-hardcoded
-    print(varFile)
+    
+    #print(varFile)
     varFile = makePath(varFile)
     varNames = getVarNames(varFile=varFile)
     workspaceDict = {}
