@@ -78,6 +78,9 @@ def path_length_transformation_plot(Table, user_parameters, transformation_funct
     '''
     Transformation functions:
     - reciprocal_function: The reciprocal function: y = 1/x. For every x except 0, y represents its multiplicative inverse.
+    -linear_flip_function: The following function is applied to flip values linearly, new_data = (data*-1) + max(data) + 1, 
+        where data is a collection of values from 1 to a given maximum. An old maximun X becomes 1 and the 1 becomes the new maximum X.
+        The linearity of all values in between is maintained
     - none
 
     '''
@@ -86,13 +89,13 @@ def path_length_transformation_plot(Table, user_parameters, transformation_funct
     x = list(range(1,len(Table.N)+1))
     y = list(Table.N) # Connections
     if transformation_function == "reciprocal_function":
-        y2 = [1/i for i in y]  # 1/x function -> new distances
-        x2 = [1/i for i in x]  #  1/x function
+        new_y = [1/i for i in y]  # 1/x function -> new distances
+        new_x = [1/i for i in x]  #  1/x function
         y_des = sorted(y,reverse=True)
         y_as = sorted(y,reverse=False)
-        y2_des = sorted(y2,reverse=True)
-        y2_as = sorted(y2,reverse=False)
-        x2_as = sorted(x2,reverse=False)
+        new_y_des = sorted(new_y,reverse=True)
+        new_y_as = sorted(new_y,reverse=False)
+        new_x_as = sorted(new_x,reverse=False)
 
         d = {} # Getting frequency of connections
         for i in y:
@@ -108,12 +111,14 @@ def path_length_transformation_plot(Table, user_parameters, transformation_funct
         y_freq_fit = np.exp(m*np.log10(x_rank)+ c) # calculate the fitted values of y 
 
         fig, axes = plt.subplots(nrows= 2,ncols=2,figsize=(30*cm, 30*cm))
+        _title = f"Edge definition as the reciprocal function, {user_parameters['graph']} : {user_parameters['column']}"
+        fig.suptitle(_title, fontsize = 12)
 
-        axes[0,0].plot(y_as,y2_des) # Edge distance transformation
+        axes[0,0].plot(y_as,new_y_des) # Edge distance transformation
         axes[0,0].set_ylabel('Edge (distance)', fontsize = 12)
         axes[0,0].set_xlabel('Number of connections', fontsize = 12)
 
-        axes[1,0].plot(y_as,y2_des) # Power law
+        axes[1,0].plot(y_as,new_y_des) # Power law
         axes[1,0].set_ylabel('Edge (distance)', fontsize = 12)
         axes[1,0].set_yscale('log')
         axes[1,0].set_xscale('log')
@@ -124,8 +129,6 @@ def path_length_transformation_plot(Table, user_parameters, transformation_funct
         axes[0,1].set_ylabel('Frequency', fontsize = 12)
 
         axes[1,1].scatter(x_rank,y_freq,s=30, alpha=0.7, edgecolors="k") # Zipf law connections
-        #axes[2].plot(x_rank, y_freq, color = 'r')
-        #axes[2].plot(x_rank, y_freq_fit, ':')
         axes[1,1].set_xlabel('Connection rank', fontsize = 12)
         axes[1,1].set_ylabel('Frequency', fontsize = 12)
         axes[1,1].set_yscale('log')
@@ -140,9 +143,30 @@ def path_length_transformation_plot(Table, user_parameters, transformation_funct
         axes[1,1].spines['right'].set_visible(False)
         axes[1,1].spines['top'].set_visible(False)
 
-
-        _title = f"Edge definition, {user_parameters['graph']} : {user_parameters['column']}"
+    
+    elif transformation_function == "linear_flip_function":
+        new_y = [(-i+int(max(y))+1) for i in y]  # linear flip function -> new distances
+        fig, axes = plt.subplots(nrows= 2,ncols=2,figsize=(30*cm, 30*cm))
+        _title = f"Edge definition lineraly flipped, {user_parameters['graph']} : {user_parameters['column']}"
         fig.suptitle(_title, fontsize = 12)
+
+        axes[0,0].plot(y) # Original distances
+        axes[0,0].set_ylabel('Edge (distance)', fontsize = 12)
+        axes[0,0].set_xlabel('Connections', fontsize = 12)
+
+        axes[0,1].plot(x,new_y) # Transformed distances
+        axes[0,1].set_ylabel('Edge (distance) flipped', fontsize = 12)
+        axes[0,1].set_xlabel('Connections', fontsize = 12)
+
+        sns.histplot(x = y, stat= 'count', binwidth=1, ax = axes[1,0])
+        axes[1,0].set_ylabel('Counts', fontsize = 12)
+        axes[1,0].set_xlabel('Synaptic count (weight)', fontsize = 12)
+
+        sns.histplot(x = new_y, stat= 'count', binwidth=1, ax = axes[1,1])
+        axes[1,1].set_ylabel('Counts', fontsize = 12)
+        axes[1,1].set_xlabel('Synaptic count (weight) flipped', fontsize = 12)
+
+
 
     print("Line plots for path length transformation done.")
     return fig
@@ -184,14 +208,20 @@ def graph_plot(Weights, user_parameters, transformation_function):
 
     Transformation functions:
     - reciprocal_function: The reciprocal function: y = 1/x. For every x except 0, y represents its multiplicative inverse.
+    -linear_flip_function: The following function is applied to flip values linearly, new_data = (data*-1) + max(data) + 1, 
+        where data is a collection of values from 1 to a given maximum. An old maximun X becomes 1 and the 1 becomes the new maximum X.
+        The linearity of all values in between is maintained
     - none
 
     '''
 
     concentricGraph = False # To generate a graph based on layers
 
-    if transformation_function == "reciprocal_function":
-        edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] # Applied transformation
+
+    if transformation_function  == 'reciprocal_function':
+        edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
+    elif transformation_function  == "linear_flip_function":
+        edges = [(k[0], k[1], {'weight': (-v+int(max(Weights.values()))+1)}) for k, v in Weights.items()] 
     elif transformation_function == "none":
         edges = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()]
 
@@ -229,29 +259,34 @@ def graph_plot(Weights, user_parameters, transformation_function):
         # pos = nx.spring_layout(G, pos = initial_node_pos, fixed = initial_node_pos ) # positions for all nodes
         #pos = nx.random_layout(G)
         pos = nx.circular_layout(G)
-        # pos = nx.kamada_kawai_layout(G)
+        pos = nx.kamada_kawai_layout(G)
         # pos = nx.spectral_layout(G) 
         #pos = nx.spiral_layout(G)
 
 
     fig,axes= plt.subplots(figsize=(20*cm, 20*cm))
-    fig.suptitle(user_parameters['file'])
+    fig.suptitle(f"Column {user_parameters['column']}, edge-length transformation: {transformation_function}")
 
     ## nodes
-    nx.draw_networkx_nodes(G,pos,node_size=600)
+    nx.draw_networkx_nodes(G,pos,node_size=300)
 
     ## labels
-    nx.draw_networkx_labels(G,pos,font_size=12,font_family='sans-serif')
+    nx.draw_networkx_labels(G,pos,font_size=6,font_family='sans-serif')
 
     ## edges
     #nx.draw_networkx_edges(G,pos,edgelist=edges, width=2,connectionstyle="arc3,rad=-0.2")
     nx.draw_networkx_edges(G,pos,edgelist=edges, width=2)
 
     ## weights
-    #labels = nx.get_edge_attributes(G,'weight')
-    # for key, value in labels .items():
-    #     labels [key]= round(1/value)
-    # nx.draw_networkx_edge_labels(G,pos,edge_labels=labels,label_pos = 0.3,font_size=10)
+    labels = nx.get_edge_attributes(G,'weight')
+    for key, value in labels.items():
+        if transformation_function  == 'reciprocal_function':
+            labels [key]= round(1/value)
+        elif transformation_function  == "linear_flip_function":
+            labels [key]= (-value+int(max(Weights.values()))+1)
+        else:
+            break
+    nx.draw_networkx_edge_labels(G,pos,edge_labels=labels,label_pos = 0.35,font_size=5)
 
     return fig
 
@@ -274,11 +309,13 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
             _key = start_node+'_'+last_node
             multiple_path_dict[_key] = path_list
 
-    path_df = pd.DataFrame(columns =['Node_to_node' ,'Path', 'Weigth'])
+    path_df = pd.DataFrame(columns =['Start_node','Last_node','Node_to_node' ,'Path', 'Weigth'])
     for key, value in multiple_path_dict.items():
         if value == []: # If there are no connections, continue with the next path
             continue
         node_to_lode_list = [key]*len(value)
+        start_node_list = [key.split('_')[0]]*len(value)
+        last_node_list = [key.split('_')[1]]*len(value)
         path_list = value
         path_weigth_list = []
         for cur_path in path_list:
@@ -342,8 +379,8 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
                         path_fig.savefig(save_dir+'weigth %.1f path %s-%s-%s-%s %s %s.pdf' % (weigth_path,user_parameters['start_node'],highlighted_path[1],highlighted_path[2],user_parameters['last_node'],user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
                 
             # Creating paths dataframe
-            cur_df = pd.DataFrame(list(zip(node_to_lode_list,path_list, path_weigth_list)),
-                   columns =['Node_to_node' ,'Path', 'Weigth'])
+            cur_df = pd.DataFrame(list(zip(start_node_list,last_node_list,node_to_lode_list,path_list, path_weigth_list)),
+                   columns =['Start_node','Last_node','Node_to_node' ,'Path', 'Weigth'])
         # Concatenating dataframes    
         path_df = path_df.append(cur_df)
                     
