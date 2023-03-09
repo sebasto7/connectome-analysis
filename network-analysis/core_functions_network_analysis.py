@@ -72,7 +72,7 @@ def dijkstra(graph, initial):
     
     return visited, path
 
-#%% Plotting function
+#%% Plotting functions
 
 def path_length_transformation_plot(Table, user_parameters, transformation_function):
     '''
@@ -298,10 +298,12 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
     #message_str = '\n >>>>>>> All paths in a distance of max %d neurons' % (user_parameters['_cutoff'])
     #print(message_str)
     multiple_path_dict = {} #For multiple start nodes to last node
+    start_node_ls = ['L1']#user_parameters['neuron_list']
+    last_node_ls = ['T4a','T4b','T4c','T4d'] #user_parameters['neuron_list']
 
-    for last_node in user_parameters['neuron_list']:
+    for last_node in last_node_ls:
 
-        for start_node in user_parameters['neuron_list']: # in user_parameters['multiple_start_nodes']
+        for start_node in start_node_ls: # in user_parameters['multiple_start_nodes']
             path_list = [] # For single start node to last node
             for path in nx.all_simple_paths(G, source=start_node , target=last_node, cutoff=user_parameters['_cutoff']):
                 path_list.append(path)
@@ -387,6 +389,14 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
             
     print('Node to node path analysis done.')
     return path_df
+
+
+def mean_path_length_plot(path_df, user_parameters,save_figures):
+    return print('Under construction')
+
+
+
+#%% Analysis functions    
 
 def centrality_analysis(G,user_parameters):
     '''
