@@ -72,6 +72,91 @@ def dijkstra(graph, initial):
     
     return visited, path
 
+def graph_creation(Table, user_parameters,microcircuit):
+
+    # Creating list of nodes
+    presynaptic_neurons = Table.PreSynapticNeuron.unique()
+    postsynaptic_neurons = Table.PostSynapticNeuron.unique()
+
+    if microcircuit:
+        neurons = user_parameters['defined_microcirtuit'] 
+        Table = Table[(Table['PreSynapticNeuron'].isin(neurons)) & (Table['PostSynapticNeuron'].isin(neurons))].copy()
+    else:
+
+        neurons = list(np.unique(np.concatenate((presynaptic_neurons,postsynaptic_neurons), axis = 0)))
+    for i,n in enumerate(neurons):
+        if n[-4:] == 'home':
+            neurons[i] = n[0:-4]
+    #[n = n[0:-4] for n in neurons if n[-4:] == 'home'] # Why this list comprehension gives error?
+
+    neurons_list_aggregated = []
+    for neuron in neurons:
+        temp_neuron = neuron[0:user_parameters['aggregate_ii']]
+        if temp_neuron not in neurons_list_aggregated:
+            neurons_list_aggregated.append(temp_neuron)
+    user_parameters['neurons_list_aggregated'] = neurons_list_aggregated
+
+    #Initialyzing and filling the graph with nodes and edges
+    customGraph = Graph()
+    if user_parameters['aggregate']:
+        neuron_list = neurons_list_aggregated
+    else:
+        neuron_list = neurons
+    user_parameters['neuron_list'] = neuron_list
+        
+    for n,neuron in enumerate(neuron_list):
+            customGraph.addNode(neuron)
+            customGraph.addNode_num(n)
+            
+    for index, row in Table.iterrows():
+        # access data using column names
+        if user_parameters['aggregate']:
+            pair = row['PreSynapticNeuron'][0:user_parameters['aggregate_ii']],row['PostSynapticNeuron'][0:user_parameters['aggregate_ii']]
+        else:
+            if row['PreSynapticNeuron'][-4:] == 'home':
+                _pre = row['PreSynapticNeuron'][0:-4]
+                _post = row['PostSynapticNeuron'][0:-4]
+            else:
+                _pre = row['PreSynapticNeuron']
+                _post = row['PostSynapticNeuron']
+
+            pair = _pre ,_post 
+            
+        if pair in customGraph.distances:
+            temp_N = customGraph.distances[pair] + row['N']
+            # print('%f + %f = %f' % (customGraph.distances[pair],row['N'],temp_N))
+            customGraph.addEdge(pair[0],pair[1],temp_N)
+        else:
+            customGraph.addEdge(pair[0],pair[1],row['N'])
+
+    # Continuation: graph creation with networkkx
+    Weights = customGraph.distances
+    for key, value in Weights.items():
+        Weights[key]= round(value) 
+
+    # Applying lenght transformation functions
+    if user_parameters['edge_length_tranformation_function'] == 'reciprocal_function':
+        edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
+    elif user_parameters['edge_length_tranformation_function'] == "linear_flip_function":
+        edges = [(k[0], k[1], {'weight': (-v+int(max(Table['N']))+1)}) for k, v in Weights.items()] 
+
+    G = nx.DiGraph() 
+    G.add_edges_from(edges)
+
+    # #Sanity check for above transformation
+    # aa = []
+    # for i in range(1,len(edges)):
+    #     aa.append(edges[i][2]['weight'])
+    # sns.histplot(x=aa, stat= 'counts', binwidth=1 )
+
+    # temporary untill fixing some code below
+    # edges_plot = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()] 
+    # G_plot = nx.DiGraph()
+    # G_plot.add_edges_from(edges_plot)
+
+    return G, customGraph
+        
+
 #%% Plotting functions
 
 def path_length_transformation_plot(Table, user_parameters, transformation_function):
@@ -286,11 +371,11 @@ def graph_plot(Weights, user_parameters, transformation_function):
             labels [key]= (-value+int(max(Weights.values()))+1)
         else:
             break
-    nx.draw_networkx_edge_labels(G,pos,edge_labels=labels,label_pos = 0.35,font_size=5)
+    #nx.draw_networkx_edge_labels(G,pos,edge_labels=labels,label_pos = 0.35,font_size=5)
 
     return fig
 
-def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,save_figures,plot_node_to_tode_paths):
+def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,save_figures,start_node_ls,last_node_ls):
     '''
     
     '''
@@ -298,8 +383,6 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
     #message_str = '\n >>>>>>> All paths in a distance of max %d neurons' % (user_parameters['_cutoff'])
     #print(message_str)
     multiple_path_dict = {} #For multiple start nodes to last node
-    start_node_ls = ['L1']#user_parameters['neuron_list']
-    last_node_ls = ['T4a','T4b','T4c','T4d'] #user_parameters['neuron_list']
 
     for last_node in last_node_ls:
 
@@ -335,7 +418,7 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
         
             
             # Optional plotting
-            if plot_node_to_tode_paths:
+            if user_parameters['plot_node_to_tode_paths']:
                 
                 path_fig,axes= plt.subplots(figsize=(20*cm, 20*cm))
                 
@@ -386,14 +469,43 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
         # Concatenating dataframes    
         path_df = path_df.append(cur_df)
                     
-            
-    print('Node to node path analysis done.')
+    #Normalizations and other calculations
+    path_df['Norm_weigth'] = list(map(lambda x, y: y/(len(x)-1), path_df['Path'], path_df['Weigth'])) # Normalizing the weigth by path length
+    path_df['Jumps'] = list(map(lambda x: len(x)-1, path_df['Path'])) # Number of jumps between nodes based on path length        
+    
+    print(f'Node to node path analysis done. Total number of paths: {len(path_df)}')
     return path_df
 
 
 def mean_path_length_plot(path_df, user_parameters,save_figures):
+    agg_functions = ['sum', 'mean', 'median', 'min', 'max', 'std', 'sem','count', 'describe', 'size','first','last']
+    mean_path_df = path_df.groupby(['Start_node', 'Last_node']).agg(agg_functions)
+
     return print('Under construction')
 
+
+def distribution_path_length_plot(path_df, user_parameters,save_figures):
+
+    fig,axes = plt.subplots(nrows = 2, ncols = 1, figsize=(30*cm, 30*cm))
+    #First axis
+    sns.histplot(x = path_df['Weigth'], stat = 'probability', ax=axes[0])
+    #axes[0].set_xlim([0,50])
+    axes[0].set_ylabel('probability')
+    axes[0].set_xlabel('Weigth') 
+
+    
+    #Another axis
+    sns.histplot(x = path_df['Norm_weigth'], stat = 'probability', ax=axes[1])
+    #axes[1].set_xlim([0,50])
+    axes[1].set_ylabel('probability')
+    axes[1].set_xlabel('Normalized weigth') 
+
+    axes[0].spines['right'].set_visible(False)
+    axes[0].spines['top'].set_visible(False)
+    axes[1].spines['right'].set_visible(False)
+    axes[1].spines['top'].set_visible(False)
+
+    return fig
 
 
 #%% Analysis functions    

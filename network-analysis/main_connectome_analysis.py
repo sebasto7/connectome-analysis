@@ -16,7 +16,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import networkx as nx
 from core_functions_network_analysis import path_length_transformation_plot, graph_plot,node_to_node_graph_analysis_and_plot
-from core_functions_network_analysis import  input_output_plot,direct_indirect_connections_plot, connections_histomgram_plot,centrality_plot,mean_path_length_plot
+from core_functions_network_analysis import  input_output_plot,direct_indirect_connections_plot, connections_histomgram_plot,centrality_plot
+from core_functions_network_analysis import graph_creation,distribution_path_length_plot,mean_path_length_plot
 from core_functions_network_analysis import Graph, centrality_analysis, direct_indirect_connections_analysis, input_output_analysis
 from core_functions_general import saveWorkspace
 
@@ -117,84 +118,14 @@ def main_analysis(user_parameters):
 
 
     #%% Graph creation
-    # Creating list of nodes
-    presynaptic_neurons = Table.PreSynapticNeuron.unique()
-    postsynaptic_neurons = Table.PostSynapticNeuron.unique()
-    neurons = list(np.unique(np.concatenate((presynaptic_neurons,postsynaptic_neurons), axis = 0)))
-    for i,n in enumerate(neurons):
-        if n[-4:] == 'home':
-            neurons[i] = n[0:-4]
-    #[n = n[0:-4] for n in neurons if n[-4:] == 'home'] # Why this list comprehension gives error?
 
-    neurons_list_aggregated = []
-    for neuron in neurons:
-        temp_neuron = neuron[0:user_parameters['aggregate_ii']]
-        if temp_neuron not in neurons_list_aggregated:
-            neurons_list_aggregated.append(temp_neuron)
-    user_parameters['neurons_list_aggregated'] = neurons_list_aggregated
-
-    #Initialyzing and filling the graph with nodes and edges
-    customGraph = Graph()
-    if user_parameters['aggregate']:
-        neuron_list = neurons_list_aggregated
-    else:
-        neuron_list = neurons
-    user_parameters['neuron_list'] = neuron_list
-        
-    for n,neuron in enumerate(neuron_list):
-            customGraph.addNode(neuron)
-            customGraph.addNode_num(n)
-            
-    for index, row in Table.iterrows():
-        # access data using column names
-        if user_parameters['aggregate']:
-            pair = row['PreSynapticNeuron'][0:user_parameters['aggregate_ii']],row['PostSynapticNeuron'][0:user_parameters['aggregate_ii']]
-        else:
-            if row['PreSynapticNeuron'][-4:] == 'home':
-                _pre = row['PreSynapticNeuron'][0:-4]
-                _post = row['PostSynapticNeuron'][0:-4]
-            else:
-                _pre = row['PreSynapticNeuron']
-                _post = row['PostSynapticNeuron']
-
-            pair = _pre ,_post 
-            
-        if pair in customGraph.distances:
-            temp_N = customGraph.distances[pair] + row['N']
-            # print('%f + %f = %f' % (customGraph.distances[pair],row['N'],temp_N))
-            customGraph.addEdge(pair[0],pair[1],temp_N)
-        else:
-            customGraph.addEdge(pair[0],pair[1],row['N'])
-
-    #%% # Graph creation with networkkx
-    Weights = customGraph.distances
-    for key, value in Weights.items():
-        Weights[key]= round(value) 
-
-    # Applying lenght transformation functions
-    if user_parameters['edge_length_tranformation_function'] == 'reciprocal_function':
-        edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
-    elif user_parameters['edge_length_tranformation_function'] == "linear_flip_function":
-        edges = [(k[0], k[1], {'weight': (-v+int(max(Table['N']))+1)}) for k, v in Weights.items()] 
-
-    G = nx.DiGraph() 
-    #G = nx.Graph()
-    G.add_edges_from(edges)
-
-    # #Sanity check for above transformation
-    # aa = []
-    # for i in range(1,len(edges)):
-    #     aa.append(edges[i][2]['weight'])
-    # sns.histplot(x=aa, stat= 'counts', binwidth=1 )
-
-    # temporary untill fixing some code below
-    edges_plot = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()] 
-    G_plot = nx.DiGraph()
-    G_plot.add_edges_from(edges_plot)
-        
+    G,customGraph = graph_creation(Table, user_parameters,microcircuit=False)
+    G_microcircuit,customGraph_microcircuit = graph_creation(Table, user_parameters,microcircuit=True)
+    
     #%% Visualizing the graph
-    fig_graph_original_length = graph_plot(Weights, user_parameters, 'none')
-    fig_graph_original_length_transformed = graph_plot(Weights, user_parameters, user_parameters['edge_length_tranformation_function'])
+    fig_graph_original_length = graph_plot(customGraph.distances, user_parameters, 'none')
+    fig_graph_original_length_transformed = graph_plot(customGraph.distances, user_parameters, user_parameters['edge_length_tranformation_function'])
+    fig_graph_original_length_transformed_microcircuit = graph_plot(customGraph_microcircuit.distances, user_parameters, user_parameters['edge_length_tranformation_function'])
 
 
     #%% Single source shortest path  (SSSP) analysis with NetwrokX
@@ -213,29 +144,21 @@ def main_analysis(user_parameters):
 
 
     #%% Node to node analysis
-    #Highlights specific paths in the graph between two nodes and save a dataFrame with all the paths
-    path_df = node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,user_parameters['save_figures'],user_parameters['plot_node_to_tode_paths'])   
-    path_df['Norm_weigth'] = list(map(lambda x, y: y/(len(x)-1), path_df['Path'], path_df['Weigth'])) # Normalizing the weigth
-    path_df['Jumps'] = list(map(lambda x: len(x)-1, path_df['Path'])) # Number of jumps between nodes
+    #Highlights specific paths in the graph between two nodes and save a dataFrame with all the path
+    
+    start_node_ls = user_parameters['neuron_list']  #start_node_ls = ['L1']
+    last_node_ls = user_parameters['neuron_list'] #last_node_ls = ['T4a','T4b','T4c','T4d']
+    user_parameters['neuron_list']
+    path_df = node_to_node_graph_analysis_and_plot(G, customGraph.distances, user_parameters,dirPath,user_parameters['save_figures'],start_node_ls,last_node_ls)   
+
 
     #TO DO: write analysis plot function for mean_path_length between pairs
-    fig_mean_path_lenght = mean_path_length_plot(path_df, user_parameters,user_parameters['save_figures'])
+    #fig_mean_path_lenght = mean_path_length_plot(path_df, user_parameters,user_parameters['save_figures'])
 
-    agg_functions = ['sum', 'mean', 'median', 'min', 'max', 'std', 'sem','count', 'describe', 'size','first','last']
-    mean_path_df = path_df.groupby(['Start_node', 'Last_node']).agg(agg_functions)
 
-    fig,axs = plt.subplots(nrows = 2, ncols = 2, figsize=(30*cm, 30*cm))
+    #TO DO: write distribution plots to describes all paths in the data set
 
-    #First axis
-    sns.histplot(x = path_df['Norm_weigth'], stat = 'probability', binwidth=1, ax=axs[1,0])
-    axs[1,0].set_xlim([0,50])
-
-    #sns.histplot(x = mean_path_df['Weigth']['mean']['Weigth'], stat = 'probability', binwidth=0.1, ax=axs[1,0])
-
-    #Another axis
-    sns.histplot(x = path_df['Jumps'], stat = 'probability', binwidth=1, ax=axs[1,1])
-    #sns.histplot(x = mean_path_df['Jumps']['mean']['Jumps'], stat = 'probability', binwidth=0.1, ax=axs[1,1])
-    fig.savefig(user_parameters['mainFolder']+'\Mi1_si.pdf')   
+    #fig_path_length_distribution = distribution_path_length_plot(path_df, user_parameters,user_parameters['save_figures'])
 
 
 
@@ -243,17 +166,19 @@ def main_analysis(user_parameters):
     #%% Centrality measures analysis
     #Currently extracting: closeness_centrality, betweenness_centrality, degree_centrality, and eigenvector_centrality
     centrality_df = centrality_analysis(G,user_parameters)
+    centrality_microcircuit_df = centrality_analysis(G_microcircuit,user_parameters) 
     #Plotting
     fig_centrality = centrality_plot(centrality_df,user_parameters)
+    fig_centrality_microcircuit = centrality_plot(centrality_microcircuit_df,user_parameters)
 
 
     #%% Direct and indirect connections analysis for all nodes
-    number_partners_dict, length_dict, norm_length_dict = direct_indirect_connections_analysis(Weights,user_parameters)
+    number_partners_dict, length_dict, norm_length_dict = direct_indirect_connections_analysis(customGraph.distances,user_parameters)
     #Plotting
     fig_direct_indirect_connections, fig_stacked_connections = direct_indirect_connections_plot(number_partners_dict,length_dict,norm_length_dict,user_parameters)
 
     #%% Input- ouput analysis
-    final_input_output_dict, final_input_df,final_output_df, final_input_ranked_df ,final_output_ranked_df,final_input_ranked_norm_df,final_output_ranked_norm_df = input_output_analysis(Weights,user_parameters)
+    final_input_output_dict, final_input_df,final_output_df, final_input_ranked_df ,final_output_ranked_df,final_input_ranked_norm_df,final_output_ranked_norm_df = input_output_analysis(customGraph.distances,user_parameters)
 
     #Input - outputs plots for a node_of_interest
     node_of_interest = user_parameters['node_of_interest']
