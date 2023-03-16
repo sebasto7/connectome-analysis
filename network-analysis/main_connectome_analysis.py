@@ -195,9 +195,13 @@ def main_analysis(user_parameters):
         if not os.path.exists(save_dir):
             os.mkdir(save_dir) # Seb: creating figures folder     
         fig_graph_original_length_transformed.savefig(save_dir+'Graph %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
+        fig_graph_original_length_transformed_microcircuit.savefig(save_dir+'Graph microcircuit %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
+
         fig_stacked_connections.savefig(save_dir+'Stacked bar plot %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
         fig_direct_indirect_connections.savefig(save_dir+'Bar plots %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
         fig_centrality.savefig(save_dir+'Centrality measures %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        fig_centrality_microcircuit.savefig(save_dir+'Centrality measures microcircuit %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        
         input_output_fig.savefig(save_dir+'Inputs and outputs - %s %s %s .pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
         input_output_fractions_fig.savefig(save_dir+'Inputs and outputs - FRACTION  %s %s .pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
         input_output_line_fig.savefig(save_dir+'Inputs and outputs FRACTION - %s %s %s .pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")

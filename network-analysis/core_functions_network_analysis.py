@@ -341,10 +341,10 @@ def graph_plot(Weights, user_parameters, transformation_function):
         pos = nx.shell_layout(G, shells)
     else:
         #pos = nx.spring_layout(G) # positions for all nodes
-        # pos = nx.spring_layout(G, pos = initial_node_pos, fixed = initial_node_pos ) # positions for all nodes
+        #pos = nx.spring_layout(G, pos = initial_node_pos, fixed = initial_node_pos ) # positions for all nodes
         #pos = nx.random_layout(G)
         pos = nx.circular_layout(G)
-        pos = nx.kamada_kawai_layout(G)
+        #pos = nx.kamada_kawai_layout(G)
         # pos = nx.spectral_layout(G) 
         #pos = nx.spiral_layout(G)
 

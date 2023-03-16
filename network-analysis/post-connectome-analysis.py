@@ -19,10 +19,13 @@ from core_functions_network_analysis import  input_output_plot,direct_indirect_c
 
 
 #%% Users parameters
-main_data_folder = r'D:\Connectomics-Data'
+main_data_folder = r'E:\Connectomics-Data'
 graph = 'Fib25_data_7medulla_columns'
 pkl_file_list = ['Home-column.pickle','A-column.pickle','B-column.pickle','C-column.pickle', 'D-column.pickle', 'E-column.pickle', 'F-column.pickle' ] # Fill in
 short_col_names = ['Ho','A','B','C', 'D', 'E', 'F' ] # Fill in
+
+pkl_file_list = ['home.pickle','-C.pickle','-D.pickle','-E.pickle'] # Fill in
+short_col_names = ['Ho','C','D','E'] # Fill in
 
 
 #%% Auto creation of important paths
@@ -72,6 +75,8 @@ all_columns_final_output_df_list = []
 all_columns_final_input_ranked_df_list = []
 all_columns_final_output_ranked_df_list = []
 all_columns_weigth_line_df_list = []
+all_columns_partners_df_list = []
+all_columns_weigth_df_list = []
 
 #%% Loading and aggregating data from different files
 
@@ -87,9 +92,11 @@ for files in range(i): #Looping across files
     temp_final_output_df = data['final_output_df']
     temp_final_input_ranked_df = data['final_input_ranked_df']
     temp_final_output_ranked_df = data['final_output_ranked_df']
-    temp_centrality_df = data['centrality_df']
+    temp_centrality_df = data['centrality_microcircuit_df']
     temp_path_df = data['path_df']
     temp_path_df['Path'] = temp_path_df['Path'].agg(lambda x: ','.join(map(str, x)))
+    temp_partners_df = pd.DataFrame(data['number_partners_dict'])
+    temp_weigth_df = pd.DataFrame(data['length_dict'])
 
     all_columns_final_input_df_list.append(temp_final_input_df)
     all_columns_final_output_df_list.append(temp_final_input_df)
@@ -97,6 +104,9 @@ for files in range(i): #Looping across files
     all_columns_final_output_ranked_df_list.append(temp_final_input_df)
     all_columns_centrality_df_list.append(temp_centrality_df)
     all_columns_path_df_list.append(temp_path_df)
+    all_columns_partners_df_list.append(temp_partners_df)
+    all_columns_weigth_df_list.append(temp_weigth_df)
+    
     
     #Dictionaries
     temp_final_input_output_dict = data['final_input_output_dict']
@@ -119,10 +129,14 @@ all_columns_final_output_df = pd.concat(all_columns_final_output_df_list)
 all_columns_final_input_ranked_df = pd.concat(all_columns_final_input_ranked_df_list)
 all_columns_final_output_ranked_df = pd.concat(all_columns_final_output_ranked_df_list)
 
-# all_columns_partners_df.reset_index(inplace = True)
-# all_columns_weigth_df.reset_index(inplace = True)
-# all_columns_partners_df.rename(columns = {'index':'Column index'}, inplace = True)
-# all_columns_weigth_df.rename(columns = {'index':'Column index'}, inplace = True)
+#TODO check if this has the correct structure
+all_columns_partners_df = pd.concat(all_columns_partners_df_list)
+all_columns_weigth_df = pd.concat(all_columns_weigth_df_list)
+
+all_columns_partners_df.reset_index(inplace = True)
+all_columns_weigth_df.reset_index(inplace = True)
+all_columns_partners_df.rename(columns = {'index':'Column index'}, inplace = True)
+all_columns_weigth_df.rename(columns = {'index':'Column index'}, inplace = True)
 
 #%% Plotting
 cm = 1/2.54  # centimeters in inches
@@ -130,93 +144,114 @@ _ci=68 # confidence interval of 68 is ~1 standard error
 
 # Add at least 4 neurons, names must be written as in the data set!
 list_of_neurons = ['Tm1','Tm2','Tm4', 'Tm9', 'Mi1','Tm3','Mi4', 'Mi9'] # 
-list_of_neurons = ['Tm1','Tm2','Tm4', 'Tm9', 'Mi1'] # 
+list_of_neurons = ['L1','L3','L5','Mi1','Tm3','CT1','C3', 'C2', 'Mi4', 'Mi9','T4a','T4b','T4c','T4d']# 
 fig_heatmap, fig_heatmap_max, fig_heatmap_sum = heatmap_plot(short_col_names,all_columns_final_input_df,list_of_neurons,user_parameters,'Input')
 
+#Quick save to visualize:
+fig_heatmap.savefig(main_data_folder +'\heatmap.pdf')
+fig_heatmap_max.savefig(main_data_folder +'\heatmap_max.pdf')
+fig_heatmap_sum.savefig(main_data_folder +'\heatmap_sum.pdf')
 
+###############################################################################
+#TODO Move this to an funtion or make the function direct_indirect_connections_plot more flexible to plot this as well
+#(Currentls all commented out)
 ############################ Bar plots with seaborn ##########################
 
-variable_partners = '# of Partners'
-variable_weigth = 'Weigth'
+# variable_partners = '# of Partners'
+# variable_weigth = 'Weigth'
 
-bar_fig2, bar_axes2 = plt.subplots(nrows= 3,ncols=2,figsize=(40*cm, 30*cm)) # All together
+# #TODO. Check the transformations being done in direct_indirect_connections_plot function
+# # all_columns_partners_df  = all_columns_partners_df.T
+# # all_columns_partners_df.columns =['Direct', 'Indirect 1', 'Indirect 2']
+# # all_columns_partners_df= all_columns_partners_df.stack().reset_index()
+# # all_columns_partners_df.rename(columns = {'level_0':'Neuron'}, inplace = True)
+# # all_columns_partners_df.rename(columns = {'level_1':'Connection'}, inplace = True)
+# # variable_partners = '# of Partners'
+# # all_columns_partners_df.rename(columns = {0:variable_partners}, inplace = True)
 
-cur_df = all_columns_weigth_df.loc[all_columns_weigth_df['Connection']== 'Direct']
-_color = 'blue'
-_order=cur_df.sort_values(variable_weigth,ascending = False).Neuron
-_order = _order.drop_duplicates(keep='first', inplace=False)
-sns.barplot(ax = bar_axes2[0,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=_order,
-            color=_color, ci = _ci)
-bar_axes2[0,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-bar_axes2[0,0].spines['right'].set_visible(False)
-bar_axes2[0,0].spines['top'].set_visible(False)            
+# bar_fig2, bar_axes2 = plt.subplots(nrows= 3,ncols=2,figsize=(40*cm, 30*cm)) # All together
 
-cur_df = all_columns_partners_df.loc[all_columns_partners_df['Connection']== 'Direct']
-_color = 'blue'
-_order=cur_df.sort_values(variable_partners,ascending = False).Neuron
-_order = _order.drop_duplicates(keep='first', inplace=False)
-sns.barplot(ax = bar_axes2[0,1],x = 'Neuron', y = variable_partners, data = cur_df, order=_order,
-            color=_color, ci = _ci)
-bar_axes2[0,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-bar_axes2[0,1].spines['right'].set_visible(False)
-bar_axes2[0,1].spines['top'].set_visible(False)  
+# cur_df = all_columns_weigth_df.loc[all_columns_weigth_df['Connection']== 'Direct']
+# _color = 'blue'
+# _order=cur_df.sort_values(variable_weigth,ascending = False).Neuron
+# _order = _order.drop_duplicates(keep='first', inplace=False)
+# sns.barplot(ax = bar_axes2[0,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=_order,
+#             color=_color, ci = _ci)
+# bar_axes2[0,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
+# bar_axes2[0,0].spines['right'].set_visible(False)
+# bar_axes2[0,0].spines['top'].set_visible(False)            
 
-cur_df = all_columns_weigth_df.loc[all_columns_weigth_df['Connection']== 'Indirect 1']
-_color = 'orange'
-_order=cur_df.sort_values(variable_weigth,ascending = False).Neuron
-_order = _order.drop_duplicates(keep='first', inplace=False)
-sns.barplot(ax = bar_axes2[1,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=_order,
-            color=_color, ci = _ci)
-bar_axes2[1,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-bar_axes2[1,0].spines['right'].set_visible(False)
-bar_axes2[1,0].spines['top'].set_visible(False)  
+# cur_df = all_columns_partners_df.loc[all_columns_partners_df['Connection']== 'Direct']
+# _color = 'blue'
+# _order=cur_df.sort_values(variable_partners,ascending = False).Neuron
+# _order = _order.drop_duplicates(keep='first', inplace=False)
+# sns.barplot(ax = bar_axes2[0,1],x = 'Neuron', y = variable_partners, data = cur_df, order=_order,
+#             color=_color, ci = _ci)
+# bar_axes2[0,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
+# bar_axes2[0,1].spines['right'].set_visible(False)
+# bar_axes2[0,1].spines['top'].set_visible(False)  
 
-cur_df = all_columns_partners_df.loc[all_columns_partners_df['Connection']== 'Indirect 1']
-_color = 'orange'
-_order=cur_df.sort_values(variable_partners,ascending = False).Neuron
-_order = _order.drop_duplicates(keep='first', inplace=False)
-sns.barplot(ax = bar_axes2[1,1],x = 'Neuron', y = variable_partners, data = cur_df, order=_order,
-            color=_color, ci = _ci)
-bar_axes2[1,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-bar_axes2[1,1].spines['right'].set_visible(False)
-bar_axes2[1,1].spines['top'].set_visible(False)  
+# cur_df = all_columns_weigth_df.loc[all_columns_weigth_df['Connection']== 'Indirect 1']
+# _color = 'orange'
+# _order=cur_df.sort_values(variable_weigth,ascending = False).Neuron
+# _order = _order.drop_duplicates(keep='first', inplace=False)
+# sns.barplot(ax = bar_axes2[1,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=_order,
+#             color=_color, ci = _ci)
+# bar_axes2[1,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
+# bar_axes2[1,0].spines['right'].set_visible(False)
+# bar_axes2[1,0].spines['top'].set_visible(False)  
 
-cur_df = all_columns_weigth_df.loc[all_columns_weigth_df['Connection']== 'Indirect 2']
-_color = 'green'
-_order=cur_df.sort_values(variable_weigth,ascending = False).Neuron
-_order = _order.drop_duplicates(keep='first', inplace=False)
-sns.barplot(ax = bar_axes2[2,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=_order,
-            color=_color, ci = _ci)
-bar_axes2[2,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-bar_axes2[2,0].spines['right'].set_visible(False)
-bar_axes2[2,0].spines['top'].set_visible(False)  
+# cur_df = all_columns_partners_df.loc[all_columns_partners_df['Connection']== 'Indirect 1']
+# _color = 'orange'
+# _order=cur_df.sort_values(variable_partners,ascending = False).Neuron
+# _order = _order.drop_duplicates(keep='first', inplace=False)
+# sns.barplot(ax = bar_axes2[1,1],x = 'Neuron', y = variable_partners, data = cur_df, order=_order,
+#             color=_color, ci = _ci)
+# bar_axes2[1,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
+# bar_axes2[1,1].spines['right'].set_visible(False)
+# bar_axes2[1,1].spines['top'].set_visible(False)  
 
-cur_df = all_columns_partners_df.loc[all_columns_partners_df['Connection']== 'Indirect 2']
-_color = 'green'
-_order=cur_df.sort_values(variable_partners,ascending = False).Neuron
-_order = _order.drop_duplicates(keep='first', inplace=False)
-sns.barplot(ax = bar_axes2[2,1],x = 'Neuron', y = variable_partners, data = cur_df, order=_order,
-            color=_color, ci = _ci)
-bar_axes2[2,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-bar_axes2[2,1].spines['right'].set_visible(False)
-bar_axes2[2,1].spines['top'].set_visible(False) 
+# cur_df = all_columns_weigth_df.loc[all_columns_weigth_df['Connection']== 'Indirect 2']
+# _color = 'green'
+# _order=cur_df.sort_values(variable_weigth,ascending = False).Neuron
+# _order = _order.drop_duplicates(keep='first', inplace=False)
+# sns.barplot(ax = bar_axes2[2,0],x = 'Neuron', y = variable_weigth, data = cur_df, order=_order,
+#             color=_color, ci = _ci)
+# bar_axes2[2,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
+# bar_axes2[2,0].spines['right'].set_visible(False)
+# bar_axes2[2,0].spines['top'].set_visible(False)  
 
-bar_axes2[0,0].set_ylabel('Synaptic count', fontsize = 8)
-bar_axes2[0,1].set_ylabel('Partners', fontsize = 8)
-bar_axes2[1,0].set_ylabel('Synaptic count', fontsize = 8)
-bar_axes2[1,1].set_ylabel('Partners', fontsize = 8)
-bar_axes2[2,0].set_ylabel('Synaptic count', fontsize = 8)
-bar_axes2[2,1].set_ylabel('Partners', fontsize = 8)
+# cur_df = all_columns_partners_df.loc[all_columns_partners_df['Connection']== 'Indirect 2']
+# _color = 'green'
+# _order=cur_df.sort_values(variable_partners,ascending = False).Neuron
+# _order = _order.drop_duplicates(keep='first', inplace=False)
+# sns.barplot(ax = bar_axes2[2,1],x = 'Neuron', y = variable_partners, data = cur_df, order=_order,
+#             color=_color, ci = _ci)
+# bar_axes2[2,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
+# bar_axes2[2,1].spines['right'].set_visible(False)
+# bar_axes2[2,1].spines['top'].set_visible(False) 
 
-_title = 'All columns ,' + graph + ': ' + ' - Direct- , - Indirect 1 - and -Indirect 2- connections'
-bar_fig2.suptitle(_title, fontsize = 12)
-plt.show()
+# bar_axes2[0,0].set_ylabel('Synaptic count', fontsize = 8)
+# bar_axes2[0,1].set_ylabel('Partners', fontsize = 8)
+# bar_axes2[1,0].set_ylabel('Synaptic count', fontsize = 8)
+# bar_axes2[1,1].set_ylabel('Partners', fontsize = 8)
+# bar_axes2[2,0].set_ylabel('Synaptic count', fontsize = 8)
+# bar_axes2[2,1].set_ylabel('Partners', fontsize = 8)
+
+# _title = 'All columns ,' + graph + ': ' + ' - Direct- , - Indirect 1 - and -Indirect 2- connections'
+# bar_fig2.suptitle(_title, fontsize = 12)
+# plt.show()
+########################
+
 
 ############################ Centrality plots with seaborn #########################
 
 #Plotting
 fig_centrality = centrality_plot(all_columns_centrality_df,user_parameters)
-
+#Quick save to visualize:
+#fig_centrality.savefig(main_data_folder +'\centrality_all_columns.pdf')
+#TODO Check if the centrality_plot function can be more flexible to also plot data with combined columns
+# specially step to "drop_duplicates"
 
 bar_fig_c, bar_axes_c = plt.subplots(nrows= 2,ncols=2,figsize=(30*cm, 30*cm)) # All together
 
