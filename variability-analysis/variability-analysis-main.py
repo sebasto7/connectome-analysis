@@ -26,9 +26,9 @@ client = CAVEclient('flywire_fafb_production')
 font = {'family' : 'arial',
         'weight' : 'normal',
         'size'   : 12}
-axes = {'labelsize': 16, 'titlesize': 16}
-ticks = {'labelsize': 14}
-legend = {'fontsize': 14}
+axes = {'labelsize': 8, 'titlesize': 8}
+ticks = {'labelsize': 4}
+legend = {'fontsize': 8}
 plt.rc('font', **font)
 plt.rc('axes', **axes)
 plt.rc('xtick', **ticks)
@@ -66,7 +66,7 @@ instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 #Path and file
 dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230612'
+fileDate = '20230613'
 fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
 
 #%% 
@@ -77,7 +77,7 @@ fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
 filePath = os.path.join(dataPath,fileName)
 df = pd.read_excel(filePath)
 
-
+#Dropping rows:
 if df["postsynaptic_ID"][0] == 'asdf': #Dropping the fisrt row ('asdf' was added as a walk-around to set that column values as type str)
     df = df.iloc[1: , :]
     df.reset_index(inplace=True,drop=True)
@@ -85,11 +85,13 @@ if df["postsynaptic_ID"][0] == 'asdf': #Dropping the fisrt row ('asdf' was added
 if 'INPUTS PROOFREAD' in df.values: # Removing unnecessary rows ment for human use only
     df = df[df['presynaptic_ID']!= 'INPUTS PROOFREAD'].copy() # Getting rid of info rows with no connectomics data
 
+if 'N.I.' in df.values: # Removing non identified (N.I.) inputs
+    df = df[df['symbol']!= 'N.I.'].copy() # Getting rid of info rows with no connectomics data
 
 #Adjusting column names to meet the naming of the FIB25 data sets (interesting for future use or comparison)
 #Creating new columns
-df['instance_pre'] = df['symbol'] + '-' + df[instance_id_column]
-df['instance_post'] = neuron_of_interest + '-' + df[instance_id_column]
+df['instance_pre'] = df['symbol'] + '::' + df[instance_id_column]
+df['instance_post'] = neuron_of_interest + '::' + df[instance_id_column]
 df['type_post'] = neuron_of_interest
 df['counts']= df['counts'].astype(int)
 #Sorting rows based on count synapse number
@@ -99,7 +101,7 @@ df['rank'] = df.groupby(['instance_post']).cumcount().tolist()
 #Renaming columns
 df.rename(columns={'presynaptic_ID':'bodyId_pre', 'counts':'W', 'postsynaptic_ID':'bodyId_post','symbol':'type_pre'}, inplace = True)
 #Keeping only columns of interest
-cols_to_keep = ['rank','patch_id','column_id','detached_lamina (Y/N)','healthy_L3 (Y/N)','instance_pre','type_pre','bodyId_pre','instance_post','type_post','bodyId_post','W']
+cols_to_keep = ['rank','patch_id','column_id','optic_lobe_id','detached_lamina (Y/N)','healthy_L3 (Y/N)','instance_pre','type_pre','bodyId_pre','instance_post','type_post','bodyId_post','W']
 df = df[cols_to_keep].copy()
 #Filtering out faulty data
 df = df[df['detached_lamina (Y/N)'] == 'N'].copy() #Keep only the columns below a healthy lamina
@@ -111,7 +113,7 @@ df['cumulative_column_percent'] = df.groupby('instance_post')['column_percent'].
 
 #Printing useful information
 id_column = df[instance_id_column].unique().tolist()
-print(f'The following column ids are part of the analysis: {id_column}')
+print(f'The following column ids (n={len(id_column)}) are part of the analysis: \n {id_column}')
 
 
 desired_count_df = df[df['W']== desired_count].copy()
@@ -240,7 +242,7 @@ counting_instances_df = pd.DataFrame()
 for c in identity_df.columns:
     temp_df = pd.DataFrame(identity_df[c].value_counts()) # counting instances
     ##TODO change the column name here from Tm9-A1 to A1, for example
-    temp_df.index = list(map(lambda x: x[0:x.find('-')],temp_df.index))# transforming from instance to type
+    temp_df.index = list(map(lambda x: x[0:x.find('::')],temp_df.index))# transforming from instance to type
     counting_instances_df = pd.concat([counting_instances_df, temp_df], axis=1) # Concatenating columns
     
     
@@ -272,12 +274,22 @@ sorted_rel_presence_absence_df = rel_presence_absence_df.sort_values(by=['Presen
 
 
 #%% 
-################################################## PLOTS #####################################################
-###############################################################################################################
+############################################### HEATMAP - PLOTS ############################################
+############################################################################################################
+
+################################################ BINARY PLOTS ##############################################
+## Visualizing the existance of a presynaptic neuron
+#Heatmap plots
 
 
-################################################INSTANCE COUNTS ##############################################
-## Visualizing counts
+#TODO INSERT CODE HERE #
+
+
+
+
+
+################################################ INSTANCE COUNTS ##############################################
+## Visualizing instance (copies of the same neuron type) counts
 #Heatmap plots
 
 #Sorting
@@ -292,17 +304,89 @@ curr_count_sorted_df = curr_df[column_order] # swapping order of columns
 curr_rank_sorted_df = counting_instances_df.T.copy()[rank_column_order]
 
 #Figure
-fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(35*cm, 75*cm))
+fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
 max_count = int(max(counting_instances_df.max()))
 _palette = sns.color_palette("tab20",max_count)
 
 #Plot
-sns.heatmap(cmap =_palette, data = curr_rank_sorted_df, vmin=1, vmax= max_count+1,cbar_kws={"ticks":list(range(1,max_count+1,1))}, ax = axs[0])
-axs[0].set_title(f'{neuron_of_interest}, Instance count, sorted by rank, syn>={desired_count}')
-axs[0].set_ylabel('Column')
-axs[0].set_xlabel('Presynaptic neuron')
+heatmap = sns.heatmap(cmap=_palette, data=curr_rank_sorted_df, vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.5}, ax=axs, square=True)
+axs.set_title(f'{neuron_of_interest}, Instance count, sorted by rank, syn>={desired_count}')
+axs.set_ylabel('Columns')
+axs.set_xlabel('Presynaptic neurons')
+
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+
+# Add ticks in the Y-axis for each row in "curr_rank_sorted_df"
+axs.set_yticks(range(len(curr_rank_sorted_df.index)))
+axs.set_yticklabels(curr_rank_sorted_df.index)
+
 
 #Plot saving
 save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest }.pdf'
+figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
 fig.savefig(save_path+figure_title)
+print('FIGURE: Visualization of instance counts plotted and saved')
+plt.close(fig)
+
+
+fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
+max_count = int(max(counting_instances_df.max()))
+_palette = sns.color_palette("tab20", max_count)
+
+# Plot (rotated 90 degrees)
+heatmap = sns.heatmap(cmap=_palette, data=curr_rank_sorted_df.transpose(), vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.5}, ax=axs, square=True)
+axs.set_title(f'{neuron_of_interest}, Instance count, sorted by rank, syn>={desired_count}')
+axs.set_xlabel('Columns')
+axs.set_ylabel('Presynaptic neurons')
+
+# Reduce font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+
+#Plot saving
+save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-vertical.pdf'
+fig.savefig(save_path+figure_title)
+print('FIGURE: Visualization of instance counts plotted and saved')
+plt.close(fig)
+
+#%% 
+############################################### NEUROPIL - PLOTS ############################################
+#############################################################################################################
+
+################################################ INSTANCE COUNTS ##############################################
+## Visualizing instance (copies of the same neuron type) counts
+#
+
+#TODO INSERT CODE HERE #
+
+
+
+
+
+
+
+
+##############################################################################################################
+##############################################################################################################
+##############################################################################################################
+
+#Temp CODE, Debugging
+
+# tem_df = pd.read_csv(r'E:\Connectomics-Data\FlyWire\Excels\optic_lobe_ids_left.csv')
+# ol_id_list = tem_df.columns.tolist()
+
+# def non_match_elements(list_a, list_b):
+#     non_match = []
+#     for i in list_a:
+#         if i not in list_b:
+#             non_match.append(i)
+#     return non_match
+
+
+# non_match = non_match_elements(ol_id_list, id_column,)
+# print("No match elements: ", non_match)
+
+# %%
