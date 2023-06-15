@@ -35,6 +35,7 @@ plt.rc('xtick', **ticks)
 plt.rc('ytick', **ticks)
 
 cm = 1/2.54  # centimeters in inches
+save_figures = True
 
 
 
@@ -65,9 +66,11 @@ neuron_of_interest = 'Tm9'
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 #Path and file
-dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230613'
+dataPath =  r'D:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
+fileDate = '20230615'
 fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
+fileName_database = f'Tm9 proofreadings_{fileDate}.xlsx'
+
 
 #%% 
 ################################################## PRE-ANALYSIS ###############################################
@@ -77,10 +80,18 @@ fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
 filePath = os.path.join(dataPath,fileName)
 df = pd.read_excel(filePath)
 
+#Loading FAFB data from our data base (excel file)
+filePath = os.path.join(dataPath,fileName_database)
+database_df = pd.read_excel(filePath)
+
 #Dropping rows:
 if df["postsynaptic_ID"][0] == 'asdf': #Dropping the fisrt row ('asdf' was added as a walk-around to set that column values as type str)
     df = df.iloc[1: , :]
     df.reset_index(inplace=True,drop=True)
+
+if database_df["seg_id"][0] == 'asdf': #Dropping the fisrt row ('asdf' was added as a walk-around to set that column values as type str)
+    database_df = database_df.iloc[1: , :]
+    database_df.reset_index(inplace=True,drop=True)
 
 if 'INPUTS PROOFREAD' in df.values: # Removing unnecessary rows ment for human use only
     df = df[df['presynaptic_ID']!= 'INPUTS PROOFREAD'].copy() # Getting rid of info rows with no connectomics data
@@ -121,6 +132,11 @@ last_percent_with_desired_count = pd.DataFrame(desired_count_df.groupby(['instan
 print(last_percent_with_desired_count)
 print(f'Coverage (%) for syn >= {desired_count}')
 print(f"The desired {desired_count} have a desired % coverage average across columns = {round(last_percent_with_desired_count['cumulative_column_percent'].mean(),2)}: ")
+
+#Getting the neuron´s meshes
+root_ids = df['bodyId_post'].unique().tolist()
+m_all = flywire.get_mesh_neuron(root_ids)
+print('- Got all neuron meshes -')
 
 #%% 
 ################################################## ANALYSIS ###################################################
@@ -232,7 +248,7 @@ curr_df = top_rank_df[['rank', 'type_pre', 'instance_post' ]].copy()
 curr_df.set_index('instance_post', inplace = True)
 curr_df = curr_df.pivot_table(values='rank', index=curr_df.index, columns='type_pre', aggfunc='first').copy()
 curr_df.fillna(100, inplace = True)# Penalizing absent nueron with rank=100
-rank_column_order = curr_df.mean().sort_values().index.tolist()
+rank_column_order = curr_df.median().sort_values().index.tolist()
 
 
 ##################################################### INSTANCES OF NEURONS ###############################################
@@ -290,6 +306,10 @@ sorted_rel_presence_absence_df = rel_presence_absence_df.sort_values(by=['Presen
 
 ################################################ INSTANCE COUNTS ##############################################
 ## Visualizing instance (copies of the same neuron type) counts
+
+#Specifi color settings for instances:
+
+color_palette_name = "tab10" # "magma", "rocket", "tab10", "plasma", , "viridis", "flare", 
 #Heatmap plots
 
 #Sorting
@@ -306,7 +326,7 @@ curr_rank_sorted_df = counting_instances_df.T.copy()[rank_column_order]
 #Figure
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
 max_count = int(max(counting_instances_df.max()))
-_palette = sns.color_palette("tab20",max_count)
+_palette = sns.color_palette(color_palette_name,max_count)
 
 #Plot
 heatmap = sns.heatmap(cmap=_palette, data=curr_rank_sorted_df, vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.5}, ax=axs, square=True)
@@ -324,16 +344,17 @@ axs.set_yticklabels(curr_rank_sorted_df.index)
 
 
 #Plot saving
-save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
-fig.savefig(save_path+figure_title)
-print('FIGURE: Visualization of instance counts plotted and saved')
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of instance counts plotted and saved')
 plt.close(fig)
 
 
 fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
 max_count = int(max(counting_instances_df.max()))
-_palette = sns.color_palette("tab20", max_count)
+_palette = sns.color_palette(color_palette_name, max_count)
 
 # Plot (rotated 90 degrees)
 heatmap = sns.heatmap(cmap=_palette, data=curr_rank_sorted_df.transpose(), vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.5}, ax=axs, square=True)
@@ -346,10 +367,11 @@ for tick_label in heatmap.get_xticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 #Plot saving
-save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-vertical.pdf'
-fig.savefig(save_path+figure_title)
-print('FIGURE: Visualization of instance counts plotted and saved')
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-vertical.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of instance counts plotted and saved')
 plt.close(fig)
 
 #%% 
@@ -358,11 +380,85 @@ plt.close(fig)
 
 ################################################ INSTANCE COUNTS ##############################################
 ## Visualizing instance (copies of the same neuron type) counts
-#
 
-#TODO INSERT CODE HERE #
+#Gettting the center point in specific neuropile from database
+xyz_neuropil = 'XYZ-ME'
+xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
+xyz_pre = xyz_df[xyz_neuropil].tolist()
+# Split each string by comma and convert the elements to floats
+xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
+xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
+
+#Getting list for dot sizes and colors based on instance counts of a pre_partner
+pre_partner = 'Tm16'
+
+#Dot sizes
+dot_sizes = counting_instances_df.T[pre_partner].fillna(0).tolist()
+dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
+dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
+
+size_color_map = {}
+color_palette = sns.color_palette(color_palette_name, len(set(dot_sizes)))
+
+#Dot colors
+dot_colors = []
+
+for size in dot_sizes:
+    if size != 0.0 and size not in size_color_map:
+        size_color_map[size] = color_palette[len(size_color_map)]
+    #dot_colors.append(size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0))
+    color = size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0)
+    color = (*color[:3], 1.0)  # Make color fully opaque
+    dot_colors.append(color)
 
 
+
+
+OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=dot_colors)  # Adjust the size (s) as desired
+navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+ax.azim = -18
+ax.elev = -148
+plt.show()
+
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Meshes_XYZ_positions_ME_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of XYZ positions plotted and saved')
+plt.close(fig)
+
+#Gettting the center point in specific neuropile from database
+xyz_neuropil = 'XYZ-LO'
+xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
+xyz_pre = xyz_df[xyz_neuropil].tolist()
+# Split each string by comma and convert the elements to floats
+xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
+xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
+
+OL_R = flywire.get_neuropil_volumes(['LO_R']) #['ME_R','LO_R','LOP_R']
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_LO,c=dot_colors)  # Adjust the size (s) as desired
+navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+ax.azim = -6
+ax.elev = -57
+plt.show()
+
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Meshes_XYZ_positions_LO_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of XYZ positions plotted and saved')
+plt.close(fig)
+
+
+print('Coding here')
 
 
 
