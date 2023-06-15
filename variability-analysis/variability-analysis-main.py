@@ -35,7 +35,7 @@ plt.rc('xtick', **ticks)
 plt.rc('ytick', **ticks)
 
 cm = 1/2.54  # centimeters in inches
-save_figures = True
+save_figures = False
 
 
 
@@ -289,6 +289,17 @@ sorted_abs_presence_absence_df = abs_presence_absence_df.sort_values(by=['Presen
 sorted_rel_presence_absence_df = rel_presence_absence_df.sort_values(by=['Present'], ascending=False)
 
 
+####################################### PRESENCE - ABSENCE of a partner ###################################
+# Turning the dataset to binary
+binary_df = counting_instances_df.T.copy()
+binary_df[binary_df.notnull()] = 1
+#binary_df[binary_df.isnull()] = 0 # Fo now, do not excecuto so that values remain NaN
+
+#sorting
+column_order = binary_df.sum().sort_values(ascending=False).index.tolist() # Sorting based on SUM of all values in the column
+binary_sum_sorted_df = binary_df[column_order] # swapping order of columns
+binary_rank_sorted_df = binary_df[rank_column_order] # swapping order of columns
+
 #%% 
 ############################################### HEATMAP - PLOTS ############################################
 ############################################################################################################
@@ -298,10 +309,29 @@ sorted_rel_presence_absence_df = rel_presence_absence_df.sort_values(by=['Presen
 #Heatmap plots
 
 
-#TODO INSERT CODE HERE #
+fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
+_palette = sns.color_palette("light:#5A9", as_cmap=True)
 
+heatmap = sns.heatmap(cmap =_palette, data = binary_rank_sorted_df, vmin=0, vmax=1, linewidths=0.2,
+                linecolor='k', cbar=False, ax = axs, square=True) 
+axs.set_title(f'{neuron_of_interest}, Binary: presence - absence, rank sorted, syn>={desired_count}')
+axs.set_ylabel('Column')
+axs.set_xlabel('Presynaptic neuron')
 
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Add ticks in the Y-axis for each row in "binary_rank_sorted_df"
+axs.set_yticks(range(len(binary_rank_sorted_df.index)))
+axs.set_yticklabels(binary_rank_sorted_df.index)
+
+if save_figures:
+    # Quick plot saving
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Binary-heatmap-presence-absence-partner_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+plt.close(fig)
 
 
 ################################################ INSTANCE COUNTS ##############################################
@@ -378,6 +408,43 @@ plt.close(fig)
 ############################################### NEUROPIL - PLOTS ############################################
 #############################################################################################################
 
+################################################ BINARY COUNTs ###############################################
+
+#Gettting the center point in specific neuropile from database
+xyz_neuropil = 'XYZ-ME'
+xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
+xyz_pre = xyz_df[xyz_neuropil].tolist()
+# Split each string by comma and convert the elements to floats
+xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
+xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
+
+#Getting list for dot sizes and colors based on instance counts of a pre_partner
+pre_partner = 'Dm12'
+
+#Dot sizes
+dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
+dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
+
+OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c='#458A7C')  # Adjust the size (s) as desired
+navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+ax.azim = -18
+ax.elev = -148
+plt.show()
+
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of XYZ positions plotted and saved')
+plt.close(fig)
+
+
+
 ################################################ INSTANCE COUNTS ##############################################
 ## Visualizing instance (copies of the same neuron type) counts
 
@@ -390,7 +457,7 @@ xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
 #Getting list for dot sizes and colors based on instance counts of a pre_partner
-pre_partner = 'Tm16'
+pre_partner = 'Dm12'
 
 #Dot sizes
 dot_sizes = counting_instances_df.T[pre_partner].fillna(0).tolist()
@@ -426,7 +493,7 @@ plt.show()
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_ME_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\Meshes_XYZ_positions_ME_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of XYZ positions plotted and saved')
 plt.close(fig)
@@ -452,15 +519,13 @@ plt.show()
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_LO_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\Meshes_XYZ_positions_LO_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of XYZ positions plotted and saved')
 plt.close(fig)
 
 
 print('Coding here')
-
-
 
 
 
