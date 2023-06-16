@@ -66,7 +66,7 @@ neuron_of_interest = 'Tm9'
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 #Path and file
-dataPath =  r'D:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
+dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
 fileDate = '20230615'
 fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
 fileName_database = f'Tm9 proofreadings_{fileDate}.xlsx'
@@ -410,6 +410,8 @@ plt.close(fig)
 
 ################################################ BINARY COUNTs ###############################################
 
+#TODO Do a loop for plotting all presynaptic neurons in same plot page
+
 #Gettting the center point in specific neuropile from database
 xyz_neuropil = 'XYZ-ME'
 xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
@@ -442,6 +444,189 @@ if save_figures:
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of XYZ positions plotted and saved')
 plt.close(fig)
+
+
+################################# PLOTTING EACH  NEURON IN DIFFERENT PDF PAGES ###########################################
+
+
+from matplotlib.backends.backend_pdf import PdfPages
+# Assuming pre_partner_list is a list of objects to be plotted
+pre_partner_list = binary_rank_sorted_df.columns.tolist()
+OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
+
+
+# Create a PDF file to save the plots
+save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{neuron_of_interest}_many_pages.pdf'
+outputPath =  save_path+figure_title
+pdf_pages = PdfPages(outputPath)
+
+# Loop through the objects and create subplots
+for i, pre_partner in enumerate(pre_partner_list):
+    # Generate the plot for the current object
+    dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+    dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
+    dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
+
+    fig = plt.figure(figsize=(8.27, 11.69))  # DIN4 page size (in inches)
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the object
+    ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME, c='#458A7C', alpha=0.9)
+    navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+
+    #Rotating the view
+    ax.azim = -18
+    ax.elev = -148
+
+    # Set plot title
+    ax.set_title(f"Presynaptic partner: {pre_partner}")
+
+    # Add any additional customization to the plot
+
+    # Save the current plot as a subplot in the PDF file
+    pdf_pages.savefig(fig, bbox_inches='tight')
+
+    # Close the current figure
+    plt.close(fig)
+
+# Save and close the PDF file
+pdf_pages.close()
+
+print(f"Plots saved in {outputPath}")
+
+
+
+################################# PLOTTING EACH  NEURON IN SAME PDF PAGE ###########################################
+
+
+from matplotlib.backends.backend_pdf import PdfPages
+from mpl_toolkits.mplot3d import Axes3D
+
+# Assuming pre_partner_list is a list of objects to be plotted
+pre_partner_list = binary_rank_sorted_df.columns.tolist()
+OL_R = flywire.get_neuropil_volumes(['ME_R'])
+
+# Create a PDF file to save the plots
+save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{neuron_of_interest}.pdf'
+outputPath =  save_path + figure_title
+outputPath = r'E:\Connectomics-Data\FlyWire\Pdf-plots\Test_02_binary.pdf'
+pdf_pages = PdfPages(outputPath)
+pdf_pages = PdfPages(outputPath)
+
+# Calculate the number of rows and columns for the grid layout
+num_plots = len(pre_partner_list)
+num_cols = 4  # Adjust the number of columns as needed
+num_rows = (num_plots - 1) // num_cols + 1
+
+# Set the figure size based on DIN4 page size
+fig_width = 8.27 *2  # Width of DIN4 page in inches
+fig_height = 11.69  *2 # Height of DIN4 page in inches
+
+# Calculate the size of each subplot
+subplot_width = fig_width / num_cols * 4  # Adjust the multiplier as needed
+subplot_height = fig_height / num_rows * 4  # Adjust the multiplier as needed
+
+# Calculate the size of the plotted content
+content_width = subplot_width * 0.9  # Adjust the multiplier as needed
+content_height = subplot_height * 0.9  # Adjust the multiplier as needed
+
+# Create the figure and subplot grid
+fig, axes = plt.subplots(num_rows, num_cols, figsize=(fig_width, fig_height), subplot_kw={'projection': '3d'})
+
+# Set the size of the plotted content in each subplot
+for ax in axes.flatten():
+    ax.set_box_aspect([content_width, content_height, content_height])
+
+# Flatten the axes array if it's a 1D array
+if num_plots == 1:
+    axes = [axes]
+
+# Loop through the objects and create subplots
+for i, (pre_partner, ax) in enumerate(zip(pre_partner_list, axes.flatten())):
+    # Generate the plot for the current object
+    dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+    dot_sizes_ME = [size * 5 for size in dot_sizes]  # Increase size by a factor of X
+
+    # Plot the object
+    ax.scatter(
+        xyz_pre_arr_new[:, 0],
+        xyz_pre_arr_new[:, 1],
+        xyz_pre_arr_new[:, 2],
+        s=dot_sizes_ME,
+        c='#458A7C',
+        alpha=0.9
+    )
+    navis.plot2d([xyz_pre_arr_new, OL_R], method='3d_complex', ax=ax, view=(172, 51)) # scalebar='20 um'
+
+    # Rotating the view
+    ax.azim = -18
+    ax.elev = -148
+
+    # Set plot title
+    ax.set_title(f"Presynaptic partner: {pre_partner}", fontsize = 8)
+
+    # Remove ticks and tick labels from XYZ axes
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+
+    # Remove the spines (axis lines)
+    ax.spines['left'].set_visible(False)
+
+    # Remove axes lines
+    ax.w_xaxis.line.set_color((0.0, 0.0, 0.0, 0.0))
+    ax.w_yaxis.line.set_color((0.0, 0.0, 0.0, 0.0))
+    ax.w_zaxis.line.set_color((0.0, 0.0, 0.0, 0.0))
+    ax.w_xaxis.line.set_linewidth(0.0)
+    ax.w_yaxis.line.set_linewidth(0.0)
+    ax.w_zaxis.line.set_linewidth(0.0)
+
+    # Remove background
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+
+    # Hide axis lines and tick markers
+    ax.w_xaxis.line.set_color("none")
+    ax.w_yaxis.line.set_color("none")
+    ax.w_zaxis.line.set_color("none")
+    ax.set_axis_off()
+
+    # Remove grid lines
+    ax.grid(False)
+
+    # Remove the axis marker
+    ax._axis3don = False
+
+    ax.axis('off')
+
+    # Add any additional customization to the plot
+
+# Remove empty subplots
+for i in range(num_plots, num_rows * num_cols):
+    fig.delaxes(axes.flatten()[i])
+
+# Adjust the spacing between subplots
+fig.subplots_adjust(wspace=0, hspace=0)
+fig.tight_layout(pad=0)
+
+# Adjust the spacing between subplots and between the title and the plot
+fig.subplots_adjust(wspace=0, hspace=0, top=0.85)
+
+# Save the figure with subplots to the PDF file
+pdf_pages.savefig(fig, bbox_inches='tight', pad_inches=0)
+
+# Close the figure and PDF file
+plt.close(fig)
+pdf_pages.close()
+
+print(f"Plots saved in {outputPath}")
+
 
 
 
