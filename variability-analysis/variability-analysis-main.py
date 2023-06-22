@@ -67,7 +67,7 @@ instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 #Path and file
 dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230615'
+fileDate = '20230621'
 fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
 fileName_database = f'Tm9 proofreadings_{fileDate}.xlsx'
 
@@ -410,7 +410,7 @@ plt.close(fig)
 
 ################################################ BINARY COUNTs ###############################################
 
-#TODO Do a loop for plotting all presynaptic neurons in same plot page
+
 
 #Gettting the center point in specific neuropile from database
 xyz_neuropil = 'XYZ-ME'
