@@ -72,10 +72,13 @@ fileDate = '20230621'
 fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
 fileName_database = f'Tm9 proofreadings_{fileDate}.xlsx'
 
+#Expansion microscopy
+ExM_dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\expansion-microscopy'
+
 
 #%% 
 ################################################## PRE-ANALYSIS ###############################################
-###############################################################################################################
+############################################# ELECTRON MICROSCOPY (EM) ########################################
 
 #Loading FAFB data from our data base (excel file)
 filePath = os.path.join(dataPath,fileName)
@@ -138,6 +141,28 @@ print(f"The desired {desired_count} have a desired % coverage average across col
 root_ids = df['bodyId_post'].unique().tolist()
 m_all = flywire.get_mesh_neuron(root_ids)
 print('- Got all neuron meshes -')
+
+#%% 
+################################################## PRE-ANALYSIS ###############################################
+############################################ EXPANSION MICROSCOPY (ExM) ########################################
+
+#Loading files and transforming data
+
+ExM_absolut_counts = {}
+for file in os.listdir(ExM_dataPath):
+    filePath = os.path.join(ExM_dataPath,file)
+    curr_df = pd.read_csv(filePath,dtype=str)
+    curr_df.drop('Unnamed: 0', axis=1, inplace=True)
+    curr_df['type_post'] = neuron_of_interest
+    curr_df.rename(columns={'counts':'W','symbol':'type_pre'}, inplace = True)
+    curr_df['instance_post'] = neuron_of_interest + '::' + curr_df['column_id']
+    curr_df['fly_ID'] = curr_df['fly_ID'] + '-ExM'
+    # Convert "W" column to integer
+    curr_df["W"] = curr_df["W"].astype(int)
+    curr_df = curr_df[curr_df['W'] >= desired_count].copy()
+    curr_df.reset_index(inplace=True)
+    ExM_absolut_counts[curr_df['type_pre'][0]] = curr_df
+
 
 #%% 
 ################################################## ANALYSIS ###################################################
@@ -456,6 +481,34 @@ popularity_abs_df = pd.DataFrame(popularity_abs_connections_dict)
 popularity_abs_df.index = type_df.index.levels[0]
 
 
+##########################################  ABSOLUTE SYNAPTIC COUNTS ##########################################
+####################################   ELECTRON AND EXPANSION MIRCORSOPY   ################################### 
+
+# Putting together ExM and EM data for specific presynaptic partners present in both
+
+
+ExM_EM_absolut_counts = {}
+for partner, curr_ExM_df in ExM_absolut_counts.items(): # for all neurons in ExM data set
+    if partner in top_rank_popularity_abs_df.columns.tolist(): # for only neurons also in EM data set
+
+        #Generating a compatible dataframe for EM
+        curr_instance_post = top_rank_popularity_abs_df[partner].index.tolist()
+        curr_count = top_rank_popularity_abs_df[partner].tolist()
+        curr_EM_df = pd.DataFrame(list(zip(curr_instance_post, curr_count)),
+               columns =['instance_post', 'W'])
+        curr_EM_df['fly_ID'] = 'EM'
+        curr_EM_df['type_pre'] = partner
+        curr_EM_df['type_post'] = neuron_of_interest
+        curr_EM_df['column_id'] = [string.split('::')[1] for string in curr_instance_post]
+        curr_EM_df.dropna(how='any', axis=0, inplace=True)
+
+
+        #Concatenating ExM and EM dataframes
+        curr_ExM_EM_df = pd.concat([curr_ExM_df,curr_EM_df])
+        curr_ExM_EM_df.reset_index(drop=True, inplace=True)
+        ExM_EM_absolut_counts[partner] = curr_ExM_EM_df
+
+
 
 ############################################ CORRELATION MATRICES #############################################
 ###############################################################################################################
@@ -527,14 +580,14 @@ correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 sorted_correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 
 
-############################################ COEFICIENT OF VARIATION ##########################################
+############################################# COEFICIENT OF VARIATION #########################################
 ###############################################################################################################
 
 # Table for Coefficient of variation calculations
 
 #Consider filtering some columns (here presynaptic neurons) or indexes that are not interested
-curr_rel_stats_df  = syn_popularity_rel_df.copy() #  No filtering
-curr_abs_stats_df  = syn_popularity_abs_df.copy() #  No filtering
+curr_rel_stats_df  = syn_popularity_rel_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
+curr_abs_stats_df  = syn_popularity_abs_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
 #curr_rel_stats_df  = syn_popularity_rel_df.filter(regex='D', axis=0).copy() # Filterinf index base on name
 #curr_abs_stats_df  = syn_popularity_abs_df.filter(regex='D', axis=0).copy() # Filterinf index base on name
 
@@ -552,10 +605,110 @@ curr_rel_stats_df['mean'] = curr_rel_stats_df.mean(axis=1)
 curr_abs_stats_df['mean'] = curr_abs_stats_df.mean(axis=1)
 
 
+
+########################################### DIMENTIONALITY Reduction ##########################################
+###############################################################################################################
+
+#For relative counts:
+# Data
+rel_data = syn_popularity_rel_df[presence_threshold_rank_column_order].copy()
+rel_data= rel_data.fillna(0)
+rel_data_array = rel_data.to_numpy(dtype=int,copy=True).T
+
+# PCA
+# Standardize
+
+rel_data_array_norm = rel_data_array-rel_data_array.mean(axis=0)
+rel_data_array_norm /= rel_data_array_norm.std(axis=0)
+n = rel_data_array_norm.shape[0]
+
+# Cov matrix and eigenvectors
+rel_cov = (1/n) * rel_data_array_norm @ rel_data_array_norm.T
+rel_eigvals, rel_eigvecs = np.linalg.eig(rel_cov)
+k = np.argsort(rel_eigvals)[::-1]
+rel_eigvals = rel_eigvals[k]
+rel_eigvecs = rel_eigvecs[:,k]
+
+#For absolute counts:
+# Data
+abs_data = syn_popularity_abs_df[presence_threshold_rank_column_order].copy()
+abs_data= abs_data.fillna(0)
+abs_data_array = abs_data.to_numpy(dtype=int,copy=True).T
+
+# PCA
+# Standardize
+
+abs_data_array_norm = abs_data_array-rel_data_array.mean(axis=0)
+abs_data_array_norm /= abs_data_array_norm.std(axis=0)
+n = abs_data_array_norm.shape[0]
+
+# Cov matrix and eigenvectors
+abs_cov = (1/n) * abs_data_array_norm @ abs_data_array_norm.T
+abs_eigvals, abs_eigvecs = np.linalg.eig(abs_cov)
+k = np.argsort(abs_eigvals)[::-1]
+abs_eigvals = abs_eigvals[k]
+abs_eigvecs = abs_eigvecs[:,k]
+
+
+
+################################################## PCA PLOTS ##################################################
+#Plotting Explained variability across dimensions
+
+##Plotting  the square-root eigenvalue spectrum
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+axs.plot(rel_eigvals/np.sum(rel_eigvals) * 100,'-o',color='black')
+axs.set_title(f'{neuron_of_interest}, Eigenvalue spectrum, syn>={desired_count}')
+axs.set_xlabel('Dimensions')
+axs.set_ylabel('Explained-variability (percentage)')
+
+#Plot saving
+if save_figures:
+    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA-exlpained-variability-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA explained variability plotted and saved')
+plt.close(fig)
+
+
+##Plotting PCA1 vs PCA2
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+axs.scatter(rel_data_array.T @ rel_eigvecs[:,0],rel_data_array.T @ rel_eigvecs[:,1])
+axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2, syn>={desired_count}')
+axs.set_xlabel('PCA1')
+axs.set_ylabel('PCA2')
+
+#Plot saving
+if save_figures:
+    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA1-PCA2-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA1 vs PCA2 plotted and saved')
+plt.close(fig)
+
+##Plotting contribution of neurons to PCA
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+im = axs.imshow(np.array([rel_eigvecs[:,0],rel_eigvecs[:,1]]).T,cmap='coolwarm',aspect='auto')
+plt.colorbar(im, ax=axs)
+axs.set_xlabel('Principal components (PCs)')
+ax = plt.gca()
+a = list(range(0, rel_eigvecs.shape[0]))
+axs.set_yticks(a)
+axs.set_yticklabels(rel_data.columns)
+plt.title('Contribution of neurons to PCs')
+
+#Plot saving
+if save_figures:
+    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Contribution-neurons-to-PCA-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Contribution of neurons to PCA plotted and saved')
+plt.close(fig)
+
 #%% 
 ############################################# PLOTTING SECTION ##############################################
 #############################################################################################################
 #############################################################################################################
+
 
 
 
@@ -1055,30 +1208,30 @@ plt.close(fig)
 _data = syn_popularity_rel_df.copy()[presence_threshold_rank_column_order]#  filtering based on " presence_threshold"
 
 #Figure
-fig, axes = plt.subplots(nrows=2,ncols=1,figsize=(30*cm, 30*cm))
+fig, axs = plt.subplots(nrows=2,ncols=1,figsize=(30*cm, 30*cm))
 fig.tight_layout(pad=10) # Adding some space between subplots
 
 
 # First axes 
 
-sns.boxplot(data = _data[_data.max().sort_values(ascending = False).index], ax = axes[0]) 
-axes[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={desired_count})')
-axes[0].set_ylabel('Synaptic count (%) ', size = 12)
-axes[0].set_xlabel('Presynaptic neuron', size = 12)
-axes[0].set_xticklabels(_data[_data.max().sort_values(ascending = False).index], rotation=90, size = 10)
-axes[0].set_yticklabels(axes[0].get_yticks(), size = 8)
+sns.boxplot(data = _data[_data.max().sort_values(ascending = False).index], ax = axs[0]) 
+axs[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={desired_count})')
+axs[0].set_ylabel('Synaptic count (%) ', size = 12)
+axs[0].set_xlabel('Presynaptic neuron', size = 12)
+axs[0].set_xticklabels(_data[_data.max().sort_values(ascending = False).index], rotation=90, size = 10)
+axs[0].set_yticklabels(axs[0].get_yticks(), size = 8)
 
 
 # Data
 _data = syn_popularity_abs_df.copy()[presence_threshold_rank_column_order]#  filtering based on " presence_threshold"
 
 # Next axes 
-sns.boxplot(data = _data[_data.max().sort_values(ascending = False).index], ax = axes[1]) 
-axes[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={desired_count})')
-axes[1].set_ylabel('Synaptic count', size = 12)
-axes[1].set_xlabel('Presynaptic neuron', size = 12)
-axes[1].set_xticklabels(_data[_data.max().sort_values(ascending = False).index], rotation=90, size = 10)
-axes[1].set_yticklabels(axes[0].get_yticks(), size = 8)
+sns.boxplot(data = _data[_data.max().sort_values(ascending = False).index], ax = axs[1]) 
+axs[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={desired_count})')
+axs[1].set_ylabel('Synaptic count', size = 12)
+axs[1].set_xlabel('Presynaptic neuron', size = 12)
+axs[1].set_xticklabels(_data[_data.max().sort_values(ascending = False).index], rotation=90, size = 10)
+axs[1].set_yticklabels(axs[1].get_yticks(), size = 8)
 
 
 #Plot saving
@@ -1098,72 +1251,118 @@ plt.close(fig)
 # Quick plot across neurons of basic descriptive statistics of variability
 
 #Figure
-fig, axs = plt.subplots(nrows=4,ncols=1,figsize=(30*cm, 50*cm))
+fig, axs = plt.subplots(nrows=4,ncols=1,figsize=(15*cm, 30*cm))
 fig.tight_layout(pad=8) # Adding some space between subplots
 
 #Data
-_data = curr_rel_stats_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
+_data = curr_rel_stats_df.copy() 
 
-#TODO For line above, do not filter for rank and thr here, do it before and here just take: curr_rel_stats_df as data ?
 
 #First axis
 sns.barplot(data = _data.iloc[[2]], ax = axs[0] )
 axs[0].axhline(y = _data.iloc[[2]]['mean'][0], color = 'k', linestyle = 'dashed')  
 axs[0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={desired_count})')
-axs[0].set_ylabel(_data.index[2])
-axs[0].set_xlabel(f'Presynaptic neuron')
+axs[0].set_ylabel(_data.index[2], size = 10)
+axs[0].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[0].set_xticklabels(_data.iloc[[2]], rotation=90)
+axs[0].set_yticklabels(axs[1].get_yticks().round(1), size = 6)
+axs[0].set_xticklabels(_data.columns.tolist(), size = 8)
+
 
 
 #First axis
 sns.barplot(data = _data.iloc[[-1]], ax = axs[1] )
 axs[1].axhline(y = _data.iloc[[-1]]['mean'][0], color = 'k', linestyle = 'dashed')  
 axs[1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={desired_count})')
-axs[1].set_ylabel(_data.index[-1])
-axs[1].set_xlabel(f'Presynaptic neuron')
+axs[1].set_ylabel(_data.index[-1], size = 10)
+axs[1].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[1].set_xticklabels(_data.iloc[[-1]], rotation=90)
+axs[1].set_yticklabels(axs[1].get_yticks().round(1), size = 6)
+axs[1].set_xticklabels(_data.columns.tolist(), size = 8)
 
 
 #Data
-_data = curr_abs_stats_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
+_data = curr_abs_stats_df.copy() 
 
 #Next axis
 sns.barplot(data = _data.iloc[[2]], ax = axs[2] )
 axs[2].axhline(y = _data.iloc[[2]]['mean'][0], color = 'k', linestyle = 'dashed')  
 axs[2].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={desired_count})')
-axs[2].set_ylabel(_data.index[2])
-axs[2].set_xlabel(f'Presynaptic neuron')
+axs[2].set_ylabel(_data.index[2], size = 10)
+axs[2].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[2].set_xticklabels(_data.iloc[[2]], rotation=90)
+axs[2].set_yticklabels(axs[1].get_yticks().round(1), size = 6)
+axs[2].set_xticklabels(_data.columns.tolist(), size = 8)
 
 #Next axis
 sns.barplot(data = _data.iloc[[-1]], ax = axs[3] )
 axs[3].axhline(y = _data.iloc[[-1]]['mean'][0], color = 'k', linestyle = 'dashed')  
 axs[3].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={desired_count})')
-axs[3].set_ylabel(_data.index[-1])
-axs[3].set_xlabel(f'Presynaptic neuron')
+axs[3].set_ylabel(_data.index[-1], size = 10)
+axs[3].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[3].set_xticklabels(_data.iloc[[-1]], rotation=90)
+axs[3].set_yticklabels(axs[1].get_yticks().round(1), size = 6)
+axs[3].set_xticklabels(_data.columns.tolist(), size = 8)
 
 
 #Plot saving
 if save_figures:
-    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Variability-measures_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of variability measures')
 plt.close(fig)
 
-# Quick plot saving
 
 
+################################################ HISTOGRAMS - PLOTS #########################################
+#############################################################################################################
+# Visualization across data sets
 
 
-#TODO Coding here:
+# Plotting ExM and Em data together for following neurons
+partner_list = list(ExM_EM_absolut_counts.keys())
+binwidth_list = [2,1,4]
 
+# Determine the number of rows and columns for subplots
+num_rows = int((len(partner_list) + 1) / 2)
+num_cols = 2
 
+# Create the figure and subplots
+fig, axs = plt.subplots(num_rows, num_cols, figsize=(5*num_cols, 5*num_rows))
+axs = axs.flatten()
 
+# Iterate over the list of partners
+for i, partner in enumerate(partner_list):
+    _data = ExM_EM_absolut_counts[partner].copy()
 
+    histplot = sns.histplot(
+        data=_data, x="W", hue="fly_ID", multiple="dodge", shrink=1,
+        log_scale=False, element="bars", fill=True, binwidth=binwidth_list[i],
+        cumulative=False, stat="percent", common_norm=False, legend=False,
+        ax=axs[i])
 
+    axs[i].set_title(f'{partner}>{neuron_of_interest}, Column counts histogram ExM and EM, syn>={desired_count}')
+    axs[i].set_ylabel('Column count (percent)', size=10)
+    axs[i].set_xlabel('Presynaptic contacts', size=10)
+    axs[i].tick_params(axis='x', labelsize=8)
+    axs[i].tick_params(axis='y', labelsize=8)
 
+    unique_labels = _data['fly_ID'].unique()
+    handles = [plt.Rectangle((0, 0), 1, 1, color=sns.color_palette()[i]) for i in range(len(unique_labels))]
+
+    axs[i].legend(handles, unique_labels, frameon=False, fontsize=4)
+
+plt.tight_layout()
+plt.show()
+
+#Plot saving
+if save_figures:
+    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    figure_title = f'\ExM-EM-histograms_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of ExM and EM histograms plotted and saved')
+plt.close(fig)
 
 
 
@@ -1521,3 +1720,100 @@ plt.close(fig)
 # print("No match elements: ", non_match)
 
 # %%
+# # OLD CODE
+
+
+# ########################################### DIMENTIONALITY Reduction ##########################################
+# ###############################################################################################################
+# from sklearn.decomposition import PCA
+# from sklearn.cluster import KMeans
+
+# ### PCA across columns - relative counts
+
+# # Define number of clusters (not mandatory for PCA, just for exploration)
+# num_clusters = 2
+
+# #Defining range of neurons (featured) to plot based on rank (defining the subset for the PCA)
+# features = presence_threshold_rank_column_order # filtering based on " presence_threshold"
+
+# #Get the features data
+# curr_rel_df = syn_popularity_rel_df[presence_threshold_rank_column_order].copy()
+# curr_rel_df_no_NaNs = curr_rel_df.fillna(0).copy() #replacing NaNs with zero
+# rel_data = curr_rel_df_no_NaNs[features].copy()
+
+
+# #Run PCA on the data and reduce the dimensions in pca_num_components dimensions
+# #Across columns
+# pca_num_components = 2
+# reduced_rel_data = PCA(n_components=pca_num_components).fit_transform(rel_data)
+# results_rel_columns = pd.DataFrame(reduced_rel_data,columns=['pca1','pca2'])
+
+
+# #Adding cluster id column
+# clustering_kmeans = KMeans(n_clusters=num_clusters)
+# rel_data['clusters'] = clustering_kmeans.fit_predict(rel_data)
+# results_rel_columns['clusters'] = rel_data['clusters'].tolist()
+
+# #Adding column id column
+# rel_data['column_id'] = [x[4:5] for x in rel_data.index.tolist()]
+# results_rel_columns['column_id'] = [x[4:5] for x in rel_data.index.tolist()]
+
+# ### PCA across columns - absolute counts
+
+# # Define number of clusters (not mandatory for PCA, just for exploration)
+# num_clusters = 2
+
+# #Defining range of neurons (featured) to plot based on rank (defining the subset for the PCA)
+# features = presence_threshold_rank_column_order # filtering based on " presence_threshold"
+
+# #Get the features data
+# curr_abs_df = syn_popularity_abs_df[presence_threshold_rank_column_order].copy()
+# curr_abs_df_no_NaNs = curr_abs_df.fillna(0).copy() #replacing NaNs with zero
+# abs_data = curr_abs_df_no_NaNs[features].copy()
+
+
+# #Run PCA on the data and reduce the dimensions in pca_num_components dimensions
+# #Across columns
+# pca_num_components = 2
+# reduced_abs_data = PCA(n_components=pca_num_components).fit_transform(abs_data)
+# results_abs_columns = pd.DataFrame(reduced_abs_data,columns=['pca1','pca2'])
+
+
+# #Adding cluster id column
+# clustering_kmeans = KMeans(n_clusters=num_clusters)
+# abs_data['clusters'] = clustering_kmeans.fit_predict(abs_data)
+# results_abs_columns['clusters'] = abs_data['clusters'].tolist()
+
+# #Adding column id column
+# abs_data['column_id'] = [x[4:5] for x in abs_data.index.tolist()]
+# results_abs_columns['column_id'] = [x[4:5] for x in abs_data.index.tolist()]
+
+
+
+# ################################################## PCA PLOTS ##################################################
+# #Plotting PCA plots
+
+# #Figure
+# fig, axs = plt.subplots(nrows=2,ncols=1, figsize=(30*cm, 30*cm)) #figsize=(20*cm, 40*cm)), figsize=(40*cm, 80*cm))
+# fig.tight_layout(pad=8) # Adding some space between subplots
+
+# #First Axis
+# sns.scatterplot(x="pca1", y="pca2", data=results_rel_columns, ax = axs[0])
+# axs[0].set_title(f'{neuron_of_interest}, PCA - count % of popular neurons (syn>={desired_count})')
+# axs[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+
+# #Next Axis
+# sns.scatterplot(x="pca1", y="pca2", data=results_abs_columns, ax = axs[1])
+# axs[1].set_title(f'{neuron_of_interest}, PCA - absolute count of popular neurons (syn>={desired_count})')
+# axs[1].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+
+
+
+# #Plot saving
+# if save_figures:
+#     save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+#     figure_title = f'\PCA-relative-subset-connectivity_{dataset_name}_{neuron_of_interest}.pdf'
+#     fig.savefig(save_path+figure_title)
+#     print('FIGURE: PCA plotted and saved')
+# plt.close(fig)
+
