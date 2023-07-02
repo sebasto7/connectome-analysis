@@ -35,7 +35,7 @@ plt.rc('xtick', **ticks)
 plt.rc('ytick', **ticks)
 
 cm = 1/2.54  # centimeters in inches
-save_figures = False
+save_figures = True
 
 
 
@@ -62,18 +62,22 @@ desired_quantile = 0.8 # selected quantile for neuron counts
 last_input_neuron = 1000 # last input to be considered in summary dataframes across columns
 
 #Data set 
-dataset_name = 'FAFB'
+dataset_name = 'FAFB_R'
+mesh_ME = 'ME_L'
+mesh_LO = 'LO_L'
+mesh_azim = 16# -18 for ME_R, 16 for ME_L
+mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 #Path and file
-dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230621'
-fileName = f'Tm9_neurons_input_count_ME_L_{fileDate}.xlsx'
+dataPath =  r'D:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
+fileDate = '20230701'
+fileName = f'Tm9_neurons_input_count_R_{fileDate}.xlsx'
 fileName_database = f'Tm9 proofreadings_{fileDate}.xlsx'
 
 #Expansion microscopy
-ExM_dataPath =  r'E:\Connectomics-Data\FlyWire\Excels\expansion-microscopy'
+ExM_dataPath =  r'D:\Connectomics-Data\FlyWire\Excels\expansion-microscopy'
 
 
 #%% 
@@ -103,6 +107,10 @@ if 'INPUTS PROOFREAD' in df.values: # Removing unnecessary rows ment for human u
 if 'N.I.' in df.values: # Removing non identified (N.I.) inputs
     df = df[df['symbol']!= 'N.I.'].copy() # Getting rid of info rows with no connectomics data
 
+if 'chunk-N.I.' in df.values: # Removing non identified (N.I.) inputs
+    df = df[df['symbol']!= 'chunk-N.I.'].copy() # Getting rid of info rows with no connectomics data
+
+
 #Adjusting column names to meet the naming of the FIB25 data sets (interesting for future use or comparison)
 #Creating new columns
 df['instance_pre'] = df['symbol'] + '::' + df[instance_id_column]
@@ -114,16 +122,16 @@ df = df.groupby(['instance_post']).apply(lambda x: x.sort_values(['counts'], asc
 #Ranking the neurons
 df['rank'] = df.groupby(['instance_post']).cumcount().tolist()
 #Renaming columns
-df.rename(columns={'presynaptic_ID':'bodyId_pre', 'counts':'W', 'postsynaptic_ID':'bodyId_post','symbol':'type_pre'}, inplace = True)
+df.rename(columns={'presynaptic_ID':'bodyId_pre', 'counts':'W','Updated_counts':'W_new', 'postsynaptic_ID':'bodyId_post','symbol':'type_pre'}, inplace = True)
 #Keeping only columns of interest
-cols_to_keep = ['rank','patch_id','column_id','optic_lobe_id','detached_lamina (Y/N)','healthy_L3 (Y/N)','instance_pre','type_pre','bodyId_pre','instance_post','type_post','bodyId_post','W']
+cols_to_keep = ['rank','patch_id','column_id','optic_lobe_id','detached_lamina (Y/N)','healthy_L3 (Y/N)','dorso-ventral','instance_pre','type_pre','bodyId_pre','instance_post','type_post','bodyId_post','W', 'W_new']
 df = df[cols_to_keep].copy()
 #Filtering out faulty data
 df = df[df['detached_lamina (Y/N)'] == 'N'].copy() #Keep only the columns below a healthy lamina
-df = df[df['healthy_L3 (Y/N)'] != 'N'].copy() #Discard the onces with clear unhealthy L3
+#df = df[df['healthy_L3 (Y/N)'] != 'N'].copy() #Discard the onces with clear unhealthy L3
 
 #Calculating relative counts (weigths)
-df['column_percent'] = round((df['W'] / df.groupby('instance_post')['W'].transform('sum'))*100,2)
+df['column_percent'] = round((df['W_new'] / df.groupby('instance_post')['W_new'].transform('sum'))*100,2)
 df['cumulative_column_percent'] = df.groupby('instance_post')['column_percent'].cumsum()
 
 #Printing useful information
@@ -131,7 +139,7 @@ id_column = df[instance_id_column].unique().tolist()
 print(f'The following column ids (n={len(id_column)}) are part of the analysis: \n {id_column}')
 
 
-desired_count_df = df[df['W']== desired_count].copy()
+desired_count_df = df[df['W_new']== desired_count].copy()
 last_percent_with_desired_count = pd.DataFrame(desired_count_df.groupby(['instance_post'])['cumulative_column_percent'].max()) #Covarage across columns per the desired_count
 print(last_percent_with_desired_count)
 print(f'Coverage (%) for syn >= {desired_count}')
@@ -139,7 +147,7 @@ print(f"The desired {desired_count} have a desired % coverage average across col
 
 #Getting the neuron´s meshes
 root_ids = df['bodyId_post'].unique().tolist()
-m_all = flywire.get_mesh_neuron(root_ids)
+#m_all = flywire.get_mesh_neuron(root_ids) # This is not yet needed
 print('- Got all neuron meshes -')
 
 #%% 
@@ -154,12 +162,12 @@ for file in os.listdir(ExM_dataPath):
     curr_df = pd.read_csv(filePath,dtype=str)
     curr_df.drop('Unnamed: 0', axis=1, inplace=True)
     curr_df['type_post'] = neuron_of_interest
-    curr_df.rename(columns={'counts':'W','symbol':'type_pre'}, inplace = True)
+    curr_df.rename(columns={'counts':'W_new','symbol':'type_pre'}, inplace = True)
     curr_df['instance_post'] = neuron_of_interest + '::' + curr_df['column_id']
     curr_df['fly_ID'] = curr_df['fly_ID'] + '-ExM'
-    # Convert "W" column to integer
-    curr_df["W"] = curr_df["W"].astype(int)
-    curr_df = curr_df[curr_df['W'] >= desired_count].copy()
+    # Convert 'W' column to integer
+    curr_df['W_new'] = curr_df['W_new'].astype(int)
+    curr_df = curr_df[curr_df['W_new'] >= desired_count].copy()
     curr_df.reset_index(inplace=True)
     ExM_absolut_counts[curr_df['type_pre'][0]] = curr_df
 
@@ -194,13 +202,13 @@ for instance in df['instance_post'].unique():
     curr_df.reset_index(inplace = True) # Important step
 
     # Adding the perceptatge of inputs
-    N_sum = curr_df['W'].sum()
-    N_percentatge = curr_df['W'].tolist()/N_sum * 100
+    N_sum = curr_df['W_new'].sum()
+    N_percentatge = curr_df['W_new'].tolist()/N_sum * 100
     curr_df['W_percentatge'] = N_percentatge.round(2) #rounding to the second decimal place
 
     #Synaptic strengh filter
-    curr_df = curr_df[curr_df['W']>=syn_thr_min].copy()
-    curr_df = curr_df[curr_df['W']>=desired_count].copy()
+    curr_df = curr_df[curr_df['W_new']>=syn_thr_min].copy()
+    curr_df = curr_df[curr_df['W_new']>=desired_count].copy()
     #print(f"Input coverage with threshold {syn_thr_min}: {round(curr_df['W_percentatge'].sum(),2)} %")
 
     #For table across columns
@@ -213,15 +221,15 @@ for instance in df['instance_post'].unique():
     
     
     #print(f"Input coverage up to the {_end}th input: {round(curr_df['W_percentatge'][0:7].sum(),2)} %")
-    abs_connections_dict[curr_df['instance_post'][0]] = curr_df['W'][0:last_input_neuron]
+    abs_connections_dict[curr_df['instance_post'][0]] = curr_df['W_new'][0:last_input_neuron]
     rel_connections_dict[curr_df['instance_post'][0]] = curr_df['W_percentatge'][0:last_input_neuron]
     abs_connections_df= pd.DataFrame(abs_connections_dict) # Here it concatenates at every loop
     rel_connections_df= pd.DataFrame(rel_connections_dict) # Here it concatenates at every loop
     
     #For scatter plots
-    index_name_ls = index_name_ls + ([instance] * len(curr_df['W'][0:last_input_neuron]))
-    input_rank_ls = input_rank_ls + list(range(0,len(curr_df['W'][0:last_input_neuron]))) #Concatenating lists across loops
-    abs_connection_ls = abs_connection_ls + curr_df['W'][0:last_input_neuron].tolist() #Concatenating lists across loops
+    index_name_ls = index_name_ls + ([instance] * len(curr_df['W_new'][0:last_input_neuron]))
+    input_rank_ls = input_rank_ls + list(range(0,len(curr_df['W_new'][0:last_input_neuron]))) #Concatenating lists across loops
+    abs_connection_ls = abs_connection_ls + curr_df['W_new'][0:last_input_neuron].tolist() #Concatenating lists across loops
     rel_connection_ls = rel_connection_ls + curr_df['W_percentatge'][0:last_input_neuron].tolist() #Concatenating lists across loops
     
 #Adding total sums inforamtion to some dataframes
@@ -273,7 +281,7 @@ stats_ranked_df ['P50_rel'] = p50_rel_ls
 
 # General rank sorting
 #First axis: synaptic filtered heatmap, top-rank data
-top_rank_df = df[(df['W']>=desired_count) & (df['rank']<last_input_neuron)].copy()
+top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
 curr_df = top_rank_df[['rank', 'type_pre', 'instance_post' ]].copy()
 curr_df.set_index('instance_post', inplace = True)
 curr_df = curr_df.pivot_table(values='rank', index=curr_df.index, columns='type_pre', aggfunc='first').copy()
@@ -354,13 +362,13 @@ top_rank_popular_neuron_ls
 #2) total percentatge of synaptic count across columns using top-rank neuron data or all data above syn threshold! 
 #Synaptic strengh filter
 #All data above syn threshold
-syn_df = df[df['W']>=desired_count].copy()
-syn_type_df = pd.DataFrame(syn_df.groupby(['instance_post', 'type_pre']).agg({'W':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
+syn_df = df[df['W_new']>=desired_count].copy()
+syn_type_df = pd.DataFrame(syn_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
 
 #Top-rank neuron data
-top_rank_df = df[(df['W']>=desired_count) & (df['rank']<last_input_neuron)].copy()
-top_rank_type_df = pd.DataFrame(top_rank_df.groupby(['instance_post', 'type_pre']).agg({'W':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
-type_df = pd.DataFrame(df.groupby(['instance_post', 'type_pre']).agg({'W':sum, 'column_percent':sum})) #Neuron type dataframe
+top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
+top_rank_type_df = pd.DataFrame(top_rank_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
+type_df = pd.DataFrame(df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe
 
 popularity_rel_connections_dict = {}
 syn_popularity_rel_connections_dict = {}
@@ -427,13 +435,13 @@ top_rank_popular_neuron_ls
 #2) total percentatge of synaptic count across columns using top-rank neuron data or all data above syn threshold! 
 #Synaptic strengh filter
 #All data above syn threshold
-syn_df = df[df['W']>=desired_count].copy()
-syn_type_df = pd.DataFrame(syn_df.groupby(['instance_post', 'type_pre']).agg({'W':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
+syn_df = df[df['W_new']>=desired_count].copy()
+syn_type_df = pd.DataFrame(syn_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
 
 #Top-rank neuron data
-top_rank_df = df[(df['W']>=desired_count) & (df['rank']<last_input_neuron)].copy()
-top_rank_type_df = pd.DataFrame(top_rank_df.groupby(['instance_post', 'type_pre']).agg({'W':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
-type_df = pd.DataFrame(df.groupby(['instance_post', 'type_pre']).agg({'W':sum, 'column_percent':sum})) #Neuron type dataframe
+top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
+top_rank_type_df = pd.DataFrame(top_rank_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
+type_df = pd.DataFrame(df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe
 
 popularity_abs_connections_dict = {}
 syn_popularity_abs_connections_dict = {}
@@ -445,7 +453,7 @@ for pre in top_rank_popular_neuron_ls: # popular neurons
     temp_percent_ls = []
     for post in top_rank_type_df.index.levels[0].tolist(): #Columns
         if pre in top_rank_type_df.loc[post].index:
-            temp_percent_ls.append(round(top_rank_type_df.loc[post,pre]['W'],2))
+            temp_percent_ls.append(round(top_rank_type_df.loc[post,pre]['W_new'],2))
         else:
             temp_percent_ls.append(np.nan)# 0 for non existing pre in post space
             
@@ -455,7 +463,7 @@ for pre in top_rank_popular_neuron_ls: # popular neurons
     temp_percent_ls = []
     for post in syn_type_df.index.levels[0].tolist(): #Columns
         if pre in syn_type_df.loc[post].index:
-            temp_percent_ls.append(round(syn_type_df.loc[post,pre]['W'],2))
+            temp_percent_ls.append(round(syn_type_df.loc[post,pre]['W_new'],2))
         else:
             temp_percent_ls.append(np.nan)# 0 for non existing pre in post space
             
@@ -465,7 +473,7 @@ for pre in top_rank_popular_neuron_ls: # popular neurons
     temp_percent_ls = []
     for post in type_df.index.levels[0].tolist(): #Columns
         if pre in type_df.loc[post].index:
-            temp_percent_ls.append(round(type_df.loc[post,pre]['W'],2))
+            temp_percent_ls.append(round(type_df.loc[post,pre]['W_new'],2))
         else:
             temp_percent_ls.append(np.nan)# 0 for non existing pre in post space
             
@@ -495,7 +503,7 @@ for partner, curr_ExM_df in ExM_absolut_counts.items(): # for all neurons in ExM
         curr_instance_post = top_rank_popularity_abs_df[partner].index.tolist()
         curr_count = top_rank_popularity_abs_df[partner].tolist()
         curr_EM_df = pd.DataFrame(list(zip(curr_instance_post, curr_count)),
-               columns =['instance_post', 'W'])
+               columns =['instance_post', 'W_new'])
         curr_EM_df['fly_ID'] = 'EM'
         curr_EM_df['type_pre'] = partner
         curr_EM_df['type_post'] = neuron_of_interest
@@ -607,7 +615,7 @@ curr_abs_stats_df['mean'] = curr_abs_stats_df.mean(axis=1)
 
 
 ########################################### DIMENTIONALITY Reduction ##########################################
-###############################################################################################################
+##################################################   PCA   ####################################################
 
 #For relative counts:
 # Data
@@ -651,58 +659,7 @@ abs_eigvecs = abs_eigvecs[:,k]
 
 
 
-################################################## PCA PLOTS ##################################################
-#Plotting Explained variability across dimensions
 
-##Plotting  the square-root eigenvalue spectrum
-fig,axs = plt.subplots(nrows =1, ncols = 1)
-axs.plot(rel_eigvals/np.sum(rel_eigvals) * 100,'-o',color='black')
-axs.set_title(f'{neuron_of_interest}, Eigenvalue spectrum, syn>={desired_count}')
-axs.set_xlabel('Dimensions')
-axs.set_ylabel('Explained-variability (percentage)')
-
-#Plot saving
-if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\PCA-exlpained-variability-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: PCA explained variability plotted and saved')
-plt.close(fig)
-
-
-##Plotting PCA1 vs PCA2
-fig,axs = plt.subplots(nrows =1, ncols = 1)
-axs.scatter(rel_data_array.T @ rel_eigvecs[:,0],rel_data_array.T @ rel_eigvecs[:,1])
-axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2, syn>={desired_count}')
-axs.set_xlabel('PCA1')
-axs.set_ylabel('PCA2')
-
-#Plot saving
-if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\PCA1-PCA2-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: PCA1 vs PCA2 plotted and saved')
-plt.close(fig)
-
-##Plotting contribution of neurons to PCA
-fig,axs = plt.subplots(nrows =1, ncols = 1)
-im = axs.imshow(np.array([rel_eigvecs[:,0],rel_eigvecs[:,1]]).T,cmap='coolwarm',aspect='auto')
-plt.colorbar(im, ax=axs)
-axs.set_xlabel('Principal components (PCs)')
-ax = plt.gca()
-a = list(range(0, rel_eigvecs.shape[0]))
-axs.set_yticks(a)
-axs.set_yticklabels(rel_data.columns)
-plt.title('Contribution of neurons to PCs')
-
-#Plot saving
-if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Contribution-neurons-to-PCA-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: Contribution of neurons to PCA plotted and saved')
-plt.close(fig)
 
 #%% 
 ############################################# PLOTTING SECTION ##############################################
@@ -758,7 +715,7 @@ axs[2].spines['top'].set_visible(False)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Percentage_columns_partner_presence_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Percentatge across columns plotted and saved')
@@ -774,7 +731,7 @@ plt.close(fig)
 #Heatmap plots
 
 #Data filtering
-_data =binary_rank_sorted_df[presence_threshold_neuron_filter] # filtering based on " presence_threshold"
+_data =binary_rank_sorted_df[presence_threshold_rank_column_order].copy()
 
 #Figure
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
@@ -790,13 +747,17 @@ axs.set_xlabel('Presynaptic neuron')
 for tick_label in heatmap.get_yticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "binary_rank_sorted_df"
 axs.set_yticks(range(len(_data.index)))
 axs.set_yticklabels(_data.index)
 
 if save_figures:
     # Quick plot saving
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Binary-heatmap-presence-absence-partner_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Binary heatmap plotted and saved')
@@ -812,7 +773,7 @@ plt.close(fig)
 color_palette_name = "tab10" # "magma", "rocket", "tab10", "plasma", , "viridis", "flare"
 
 #Data filtering
-curr_df = counting_instances_df.T[presence_threshold_neuron_filter].copy() #  filtering based on " presence_threshold"
+curr_df = counting_instances_df.T[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
 
 #Sorting based on max, sum and count
 column_order = curr_df.max().sort_values(ascending=False).index.tolist() # Sorting based on MAX of all values in the column
@@ -845,6 +806,10 @@ axs.set_xlabel('Presynaptic neurons')
 for tick_label in heatmap.get_yticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
 axs.set_yticklabels(_data.index)
@@ -856,7 +821,7 @@ axs.set_xticklabels(_data.columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of instance counts plotted vertically and saved')
@@ -879,6 +844,10 @@ axs.set_ylabel('Presynaptic neurons')
 for tick_label in heatmap.get_xticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
 axs.set_yticklabels(_data.transpose().index)
@@ -890,7 +859,7 @@ axs.set_xticklabels(_data.transpose().columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of instance counts plotted horizontally and saved')
@@ -923,6 +892,10 @@ axs.set_xlabel('Presynaptic neuron')
 for tick_label in heatmap.get_yticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
 axs.set_yticklabels(_data.index)
@@ -935,7 +908,7 @@ axs.set_xticklabels(_data.columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Relative-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of relative counts plotted vertically and saved')
@@ -962,6 +935,10 @@ axs.set_ylabel('Presynaptic neuron')
 for tick_label in heatmap.get_xticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
 axs.set_yticklabels(_data.transpose().index)
@@ -973,7 +950,7 @@ axs.set_xticklabels(_data.transpose().columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Relative-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of relative counts plotted horizontally and saved')
@@ -1007,6 +984,10 @@ axs.set_xlabel('Presynaptic neuron')
 for tick_label in heatmap.get_yticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
 axs.set_yticklabels(_data.index)
@@ -1019,7 +1000,7 @@ axs.set_xticklabels(_data.columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Absolute-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of absolute counts plotted vertically and saved')
@@ -1044,6 +1025,10 @@ axs.set_ylabel('Presynaptic neuron')
 for tick_label in heatmap.get_xticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
 axs.set_yticklabels(_data.transpose().index)
@@ -1055,7 +1040,7 @@ axs.set_xticklabels(_data.transpose().columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Absolute-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of absolute counts plotted horizontally and saved')
@@ -1093,6 +1078,10 @@ axs.set_xlabel('Presynaptic neuron')
 for tick_label in heatmap.get_yticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
 axs.set_yticklabels(_data.index)
@@ -1104,7 +1093,7 @@ axs.set_xticklabels(_data.columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Rank-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of ranks plotted vertically and saved')
@@ -1130,6 +1119,10 @@ axs.set_ylabel('Presynaptic neuron')
 for tick_label in heatmap.get_xticklabels():
     tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
 axs.set_yticklabels(_data.transpose().index)
@@ -1140,7 +1133,7 @@ axs.set_xticklabels(_data.transpose().columns)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Rank-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of ranks plotted horizontally and saved')
@@ -1169,11 +1162,11 @@ g.ax_cbar.set_title('pearson')
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Hierarchical-clustering-correlation-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
     g.savefig(save_path+figure_title)
     print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
-plt.close(fig)
+plt.close(g.fig)
 
 
 correlation_abs_no_NaN_df.replace(np.NaN,1.0, inplace = True)
@@ -1191,11 +1184,11 @@ g.ax_cbar.set_title('pearson')
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
     g.savefig(save_path+figure_title)
     print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
-plt.close(fig)
+plt.close(g.fig)
 
 
 ############################################# BOXPLOTS - PLOTS ##############################################
@@ -1236,7 +1229,7 @@ axs[1].set_yticklabels(axs[1].get_yticks(), size = 8)
 
 #Plot saving
 if save_figures:
-    save_path =  r'E:\Connectomics-Data\FlyWire\Pdf-plots' #r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path =  r'D:\Connectomics-Data\FlyWire\Pdf-plots' #r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Box-plot-presynaptic-partners_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of presynaptic partners contacts')
@@ -1307,7 +1300,7 @@ axs[3].set_xticklabels(_data.columns.tolist(), size = 8)
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\Variability-measures_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of variability measures')
@@ -1322,7 +1315,7 @@ plt.close(fig)
 
 # Plotting ExM and Em data together for following neurons
 partner_list = list(ExM_EM_absolut_counts.keys())
-binwidth_list = [2,1,4]
+binwidth_list = [2,1,4,2]
 
 # Determine the number of rows and columns for subplots
 num_rows = int((len(partner_list) + 1) / 2)
@@ -1337,7 +1330,7 @@ for i, partner in enumerate(partner_list):
     _data = ExM_EM_absolut_counts[partner].copy()
 
     histplot = sns.histplot(
-        data=_data, x="W", hue="fly_ID", multiple="dodge", shrink=1,
+        data=_data, x='W_new', hue="fly_ID", multiple="dodge", shrink=1,
         log_scale=False, element="bars", fill=True, binwidth=binwidth_list[i],
         cumulative=False, stat="percent", common_norm=False, legend=False,
         ax=axs[i])
@@ -1354,11 +1347,10 @@ for i, partner in enumerate(partner_list):
     axs[i].legend(handles, unique_labels, frameon=False, fontsize=4)
 
 plt.tight_layout()
-plt.show()
 
 #Plot saving
 if save_figures:
-    save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
     figure_title = f'\ExM-EM-histograms_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of ExM and EM histograms plotted and saved')
@@ -1366,26 +1358,60 @@ plt.close(fig)
 
 
 
+#%% 
+################################################## PCA PLOTS ##################################################
+#############################################################################################################
+#Plotting Explained variability across dimensions
+
+##Plotting  the square-root eigenvalue spectrum
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+axs.plot(rel_eigvals/np.sum(rel_eigvals) * 100,'-o',color='black')
+axs.set_title(f'{neuron_of_interest}, Eigenvalue spectrum, syn>={desired_count}')
+axs.set_xlabel('Dimensions')
+axs.set_ylabel('Explained-variability (percentage)')
+
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA-exlpained-variability-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA explained variability plotted and saved')
+plt.close(fig)
 
 
+##Plotting PCA1 vs PCA2
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+axs.scatter(rel_data_array.T @ rel_eigvecs[:,0],rel_data_array.T @ rel_eigvecs[:,1])
+axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2, syn>={desired_count}')
+axs.set_xlabel('PCA1')
+axs.set_ylabel('PCA2')
 
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA1-PCA2-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA1 vs PCA2 plotted and saved')
+plt.close(fig)
 
+##Plotting contribution of neurons to PCA (EIgenvectors)
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+im = axs.imshow(np.array([rel_eigvecs[:,0],rel_eigvecs[:,1]]).T,cmap='coolwarm',aspect='auto')
+plt.colorbar(im, ax=axs)
+axs.set_xlabel('Principal components (PCs)')
+ax = plt.gca()
+a = list(range(0, rel_eigvecs.shape[0]))
+axs.set_yticks(a)
+axs.set_yticklabels(rel_data.columns)
+plt.title('Contribution of neurons to PCs')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Contribution-neurons-to-PCA-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Contribution of neurons to PCA plotted and saved')
+plt.close(fig)
 
 
 
@@ -1395,7 +1421,7 @@ plt.close(fig)
 #############################################################################################################
 
 ################################################ BINARY COUNTs ###############################################
-
+#Plotting a single neuron
 
 
 #Gettting the center point in specific neuropile from database
@@ -1407,98 +1433,47 @@ xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
 #Getting list for dot sizes and colors based on instance counts of a pre_partner
-pre_partner = 'Dm12'
+pre_partner = 'Tm16'
 
 #Dot sizes
 dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
 dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
 dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
 
-OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
+#Seb commented out since we plot all neurons in the next step anyways
+OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c='#458A7C')  # Adjust the size (s) as desired
 navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
-ax.azim = -18
-ax.elev = -148
-plt.show()
+ax.azim = mesh_azim 
+ax.elev = mesh_elev 
+#plt.show()
 
-#Plot saving
-if save_figures:
-    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of XYZ positions plotted and saved')
-plt.close(fig)
-
-
-################################# PLOTTING EACH  NEURON IN DIFFERENT PDF PAGES ###########################################
-
-
-from matplotlib.backends.backend_pdf import PdfPages
-# Assuming pre_partner_list is a list of objects to be plotted
-pre_partner_list = binary_rank_sorted_df.columns.tolist()
-OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
-
-
-# Create a PDF file to save the plots
-save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{neuron_of_interest}_many_pages.pdf'
-outputPath =  save_path+figure_title
-pdf_pages = PdfPages(outputPath)
-
-# Loop through the objects and create subplots
-for i, pre_partner in enumerate(pre_partner_list):
-    # Generate the plot for the current object
-    dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
-    dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
-    dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
-
-    fig = plt.figure(figsize=(8.27, 11.69))  # DIN4 page size (in inches)
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plot the object
-    ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME, c='#458A7C', alpha=0.9)
-    navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
-
-    #Rotating the view
-    ax.azim = -18
-    ax.elev = -148
-
-    # Set plot title
-    ax.set_title(f"Presynaptic partner: {pre_partner}")
-
-    # Add any additional customization to the plot
-
-    # Save the current plot as a subplot in the PDF file
-    pdf_pages.savefig(fig, bbox_inches='tight')
-
-    # Close the current figure
-    plt.close(fig)
-
-# Save and close the PDF file
-pdf_pages.close()
-
-print(f"Plots saved in {outputPath}")
+# #Plot saving
+# if save_figures:
+#     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+#     figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+#     fig.savefig(save_path+figure_title)
+#     print('FIGURE: Visualization of XYZ positions plotted and saved')
+# plt.close(fig)
 
 
 
-################################# PLOTTING EACH  NEURON IN SAME PDF PAGE ###########################################
-
+################################################ BINARY COUNTs ###############################################
+# Plotting all neurons in the same pdf page
 
 from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.mplot3d import Axes3D
 
 # Assuming pre_partner_list is a list of objects to be plotted
 pre_partner_list = binary_rank_sorted_df.columns.tolist()
-OL_R = flywire.get_neuropil_volumes(['ME_R'])
+OL_R = flywire.get_neuropil_volumes([mesh_ME])
 
 # Create a PDF file to save the plots
-save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots'
-figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{neuron_of_interest}.pdf'
+save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
+figure_title = f'\Meshes_XYZ_positions_ME_binary_all_partners_{dataset_name}_{neuron_of_interest}.pdf'
 outputPath =  save_path + figure_title
-outputPath = r'E:\Connectomics-Data\FlyWire\Pdf-plots\Test_02_binary.pdf'
-pdf_pages = PdfPages(outputPath)
 pdf_pages = PdfPages(outputPath)
 
 # Calculate the number of rows and columns for the grid layout
@@ -1547,8 +1522,8 @@ for i, (pre_partner, ax) in enumerate(zip(pre_partner_list, axes.flatten())):
     navis.plot2d([xyz_pre_arr_new, OL_R], method='3d_complex', ax=ax, view=(172, 51)) # scalebar='20 um'
 
     # Rotating the view
-    ax.azim = -18
-    ax.elev = -148
+    ax.azim = mesh_azim 
+    ax.elev = mesh_elev 
 
     # Set plot title
     ax.set_title(f"Presynaptic partner: {pre_partner}", fontsize = 8)
@@ -1618,6 +1593,7 @@ print(f"Plots saved in {outputPath}")
 
 ################################################ INSTANCE COUNTS ##############################################
 ## Visualizing instance (copies of the same neuron type) counts
+# Plots for single neurons of interest
 
 #Gettting the center point in specific neuropile from database
 xyz_neuropil = 'XYZ-ME'
@@ -1628,7 +1604,7 @@ xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
 #Getting list for dot sizes and colors based on instance counts of a pre_partner
-pre_partner = 'Dm12'
+pre_partner = 'Tm16'
 
 #Dot sizes
 dot_sizes = counting_instances_df.T[pre_partner].fillna(0).tolist()
@@ -1652,19 +1628,19 @@ for size in dot_sizes:
 
 
 
-OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
+OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=dot_colors)  # Adjust the size (s) as desired
 navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
-ax.azim = -18
-ax.elev = -148
-plt.show()
+ax.azim = mesh_azim 
+ax.elev = mesh_elev 
+#plt.show()
 
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_ME_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+    figure_title = f'\Meshes_XYZ_positions_instance_counts_ME_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of XYZ positions plotted and saved')
 plt.close(fig)
@@ -1677,7 +1653,7 @@ xyz_pre = xyz_df[xyz_neuropil].tolist()
 xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
-OL_R = flywire.get_neuropil_volumes(['LO_R']) #['ME_R','LO_R','LOP_R']
+OL_R = flywire.get_neuropil_volumes([mesh_LO]) #['ME_R','LO_R','LOP_R']
 
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
@@ -1685,12 +1661,12 @@ ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], 
 navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
 ax.azim = -6
 ax.elev = -57
-plt.show()
+#plt.show()
 
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_LO_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+    figure_title = f'\Meshes_XYZ_positions_instance_counts_LO_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of XYZ positions plotted and saved')
 plt.close(fig)
@@ -1708,12 +1684,12 @@ plt.close(fig)
 # tem_df = pd.read_csv(r'E:\Connectomics-Data\FlyWire\Excels\optic_lobe_ids_left.csv')
 # ol_id_list = tem_df.columns.tolist()
 
-# def non_match_elements(list_a, list_b):
-#     non_match = []
-#     for i in list_a:
-#         if i not in list_b:
-#             non_match.append(i)
-#     return non_match
+def non_match_elements(list_a, list_b):
+     non_match = []
+     for i in list_a:
+         if i not in list_b:
+             non_match.append(i)
+     return non_match
 
 
 # non_match = non_match_elements(ol_id_list, id_column,)
@@ -1721,6 +1697,56 @@ plt.close(fig)
 
 # %%
 # # OLD CODE
+
+# ################################################ BINARY COUNTs ###############################################
+# ################################# PLOTTING EACH  NEURON IN DIFFERENT PDF PAGES ###############################
+
+
+# from matplotlib.backends.backend_pdf import PdfPages
+# # Assuming pre_partner_list is a list of objects to be plotted
+# pre_partner_list = binary_rank_sorted_df.columns.tolist()
+# OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
+
+
+# # Create a PDF file to save the plots
+# save_path = r'E:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
+# figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{neuron_of_interest}_many_pages.pdf'
+# outputPath =  save_path+figure_title
+# pdf_pages = PdfPages(outputPath)
+
+# # Loop through the objects and create subplots
+# for i, pre_partner in enumerate(pre_partner_list):
+#     # Generate the plot for the current object
+#     dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+#     dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
+#     dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
+
+#     fig = plt.figure(figsize=(8.27, 11.69))  # DIN4 page size (in inches)
+#     ax = fig.add_subplot(111, projection='3d')
+
+#     # Plot the object
+#     ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME, c='#458A7C', alpha=0.9)
+#     navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+
+#     #Rotating the view
+#     ax.azim = mesh_azim 
+#     ax.elev = mesh_elev 
+
+#     # Set plot title
+#     ax.set_title(f"Presynaptic partner: {pre_partner}")
+
+#     # Add any additional customization to the plot
+
+#     # Save the current plot as a subplot in the PDF file
+#     pdf_pages.savefig(fig, bbox_inches='tight')
+
+#     # Close the current figure
+#     plt.close(fig)
+
+# # Save and close the PDF file
+# pdf_pages.close()
+
+# print(f"Plots saved in {outputPath}")
 
 
 # ########################################### DIMENTIONALITY Reduction ##########################################
