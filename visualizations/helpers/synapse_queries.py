@@ -206,3 +206,62 @@ def filter_points(points, threshold_distance):
 
     return filtered_points
 
+
+import math
+
+def calculate_distance_nearest_neighbour(points, lower_threshold, upper_threshold):
+    """
+    Calculate the distances from each point to its nearest neighbor in a list of points in 3D space.
+    Only distances within the specified threshold values are included in the output list.
+
+    Args:
+        points (list): A list of points in XYZ format.
+        lower_threshold (float): The lower threshold value for distances to be included.
+        upper_threshold (float): The upper threshold value for distances to be included.
+
+    Returns:
+        list: A list of distances within the specified threshold values.
+    """
+    resolution_x = 4  # nm
+    resolution_y = 4  # nm
+    resolution_z = 40  # nm
+
+    # Scale the coordinates of all points using the resolution values
+    scaled_points = [[point[0] * resolution_x, point[1] * resolution_y, point[2] * resolution_z] for point in points]
+
+    distances = []
+    
+    for i, point1 in enumerate(scaled_points):
+        nearest_distance = math.inf
+        
+        for j, point2 in enumerate(scaled_points):
+            if i != j:  # Skip the same point
+                # Step 1: Calculate distance in X and Y coordinates separately
+                diff_x = point2[0] - point1[0]
+                diff_y = point2[1] - point1[1]
+                distance_x = abs(diff_x)
+                distance_y = abs(diff_y)
+
+                # Step 2: Calculate the sum of distances in X and Y coordinates
+                distance_xy = math.sqrt(distance_x**2 + distance_y**2)
+
+                # Step 3: Assign distance_xy to variable "a"
+                a = distance_xy
+
+                # Step 4: Calculate distance in Z coordinate
+                diff_z = point2[2] - point1[2]
+                distance_z = abs(diff_z)
+
+                # Step 5: Assign distance_z to variable "b"
+                b = distance_z
+
+                # Step 6: Calculate the hypotenuse "h" using Pythagoras' theorem
+                h = math.sqrt(a**2 + b**2)
+
+                if h < nearest_distance:
+                    nearest_distance = h
+        
+        if lower_threshold <= nearest_distance <= upper_threshold:
+            distances.append(nearest_distance)
+
+    return distances
