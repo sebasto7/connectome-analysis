@@ -27,18 +27,25 @@ font = {'family' : 'arial',
         'weight' : 'normal',
         'size'   : 12}
 axes = {'labelsize': 8, 'titlesize': 8}
-ticks = {'labelsize': 6}
+ticks = {'labelsize': 4}
 legend = {'fontsize': 8}
 plt.rc('font', **font)
 plt.rc('axes', **axes)
 plt.rc('xtick', **ticks)
 plt.rc('ytick', **ticks)
 
+#Saving text for pdfs in a proper way
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 cm = 1/2.54  # centimeters in inches
 save_figures = True
 
 # Temporary before fixing bug in correlation analysis when samples have NaNs
-plot_correlation = True
+plot_correlation = False
+
+#Sorting options for plots
+sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%'
 
 
 #%% 
@@ -52,7 +59,7 @@ desired_coverage = 80 # in percent
 plus_minus = 5 # in percent
 
 #Synaptic counts
-desired_count = 4 # minimun number of synapses to consider in the analysis # Tm1:4, Tm9:3
+desired_count = 3 # minimun number of synapses to consider in the analysis # Tm1:4, Tm9:3, Tm2:4, 
 syn_thr_min = 1 # minimun number of synaptic contacts to be considered as relevant for the analysis
 num_type_copies_min = 2 #Number for neuron copies relevant for the low-synapses partners
 presence_threshold = 0.05 # If a partner is in less than 5% of the columns, it will be discarted for further visualizations
@@ -68,13 +75,13 @@ d_v_filter = False
 selection_area = ''
 
 #Data set 
-optic_lobe = 'L'
+optic_lobe = 'R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
-mesh_ME = 'ME_R'
-mesh_LO = 'LO_R'
-mesh_azim = -18# -18 for ME_R, 16 for ME_L
-mesh_elev = -148 # -148 for ME_R, -50 for ME_L
-neuron_of_interest = 'Tm1' 
+mesh_ME = 'ME_L'
+mesh_LO = 'LO_L'
+mesh_azim =16# -18 for ME_R, 16 for ME_L
+mesh_elev = -50 # -148 for ME_R, -50 for ME_L
+neuron_of_interest = 'Tm9' 
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
 dots_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
@@ -82,7 +89,7 @@ instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 #Path and file
 dataPath =  r'D:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230704'
+fileDate = '20230709'
 fileName = f'{neuron_of_interest}_neurons_input_count_{optic_lobe}_{fileDate}.xlsx'
 fileName_database = f'{neuron_of_interest} proofreadings_{fileDate}.xlsx'
 
@@ -93,7 +100,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  r'D:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = 'Tm9_sparse_L.txt'
+fileName_txt = 'Tm9_dark_L3_R.txt' # 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt'
 
 
 #Expansion microscopy
@@ -101,7 +108,7 @@ ExM_dataPath =  r'D:\Connectomics-Data\FlyWire\Excels\expansion-microscopy'
 
 
 #Processed data saving path
-saving_processed_data = True
+saving_processed_data = False
 output_dataPath = r'D:\Connectomics-Data\FlyWire\Processed-data'
 
 #%% 
@@ -154,6 +161,7 @@ df = df[cols_to_keep].copy()
 
 #Filtering out faulty data
 df = df[df['detached_lamina (Y/N)'] == 'N'].copy() #Keep only the columns below a healthy lamina
+#df = df[df['healthy_L3 (Y/N)'] == 'Y'].copy() #Keep only the columns with healthy (non-dark) L3
 
 #Subselection filter:
 if subselection_filter:
@@ -285,10 +293,10 @@ abs_connections_df
 ################################################# RANKS #######################################################
 ###############################################################################################################
 #Analysis across ranks
-rank_df = pd.DataFrame(index=index_name_ls)
-rank_df ['Abs_connection'] = abs_connection_ls
-rank_df ['Rel_connection'] = rel_connection_ls
-rank_df ['Connection_rank'] = input_rank_ls
+rank_rel_abs_df = pd.DataFrame(index=index_name_ls)
+rank_rel_abs_df ['Abs_connection'] = abs_connection_ls
+rank_rel_abs_df ['Rel_connection'] = rel_connection_ls
+rank_rel_abs_df ['Connection_rank'] = input_rank_ls
 
 mean_abs_ls = [] # For variability analysis 
 mean_rel_ls = [] # For variability analysis 
@@ -299,9 +307,9 @@ CV_rel_ls = [] # For variability analysis (CV = coefficient of variation)
 p50_abs_ls = [] # For variability analysis 
 p50_rel_ls = [] # For variability analysis 
 
-for rank in rank_df['Connection_rank'].unique():
+for rank in rank_rel_abs_df['Connection_rank'].unique():
     
-    curr_df = rank_df[rank_df['Connection_rank'] == rank].copy()
+    curr_df = rank_rel_abs_df[rank_rel_abs_df['Connection_rank'] == rank].copy()
     #Variability indexes
     mean_abs_ls.append(round(np.mean(curr_df['Abs_connection'].tolist()),2)) 
     mean_rel_ls.append(round(np.mean(curr_df['Rel_connection'].tolist()),2)) 
@@ -312,7 +320,7 @@ for rank in rank_df['Connection_rank'].unique():
     p50_abs_ls.append(round(np.percentile(curr_df['Abs_connection'].tolist(),50),2)) 
     p50_rel_ls.append(round(np.percentile(curr_df['Rel_connection'].tolist(),50),2))
     
-stats_ranked_df = pd.DataFrame(index=rank_df['Connection_rank'].unique())
+stats_ranked_df = pd.DataFrame(index=rank_rel_abs_df['Connection_rank'].unique())
 stats_ranked_df ['Mean_abs'] = mean_abs_ls
 stats_ranked_df ['Mean_rel'] = mean_rel_ls
 stats_ranked_df ['Std_abs'] = std_abs_ls
@@ -327,12 +335,16 @@ stats_ranked_df ['P50_rel'] = p50_rel_ls
 top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
 curr_df = top_rank_df[['rank', 'type_pre', 'instance_post' ]].copy()
 curr_df.set_index('instance_post', inplace = True)
-curr_df = curr_df.pivot_table(values='rank', index=curr_df.index, columns='type_pre', aggfunc='first').copy()
+# Choosing the rank for 'type_pre' as the rank of the first ocurrance
+rank_df = curr_df.pivot_table(values='rank', index=curr_df.index, columns='type_pre', aggfunc='first').copy()
 
 #Adding the median of the existing values in other row if NaN (soft penalization)
-median_values = curr_df.median()  # Calculate the median for each column
-curr_df.fillna(median_values, inplace = True) 
-rank_column_order = curr_df.median().sort_values().index.tolist()
+median_values = rank_df.median()  # Calculate the median for each column4
+abscence_penalty = 100
+#rank_df.fillna(abscence_penalty, inplace = True) # In case we wanna add a penalty value in columns where the cell type is absent. 
+if sort_by == 'median_rank':
+    rank_column_order = rank_df.median().sort_values().index.tolist()
+    sorted_column_order = rank_df.median().sort_values().index.tolist()
 
 
 ############################################# INSTANCES OF NEURONS ############################################
@@ -376,9 +388,13 @@ sorted_abs_presence_absence_df = abs_presence_absence_df.sort_values(by=['Presen
 sorted_rel_presence_absence_df = rel_presence_absence_df.sort_values(by=['Present'], ascending=False)
 sorted_thr_rel_presence_absence_df = thr_rel_presence_absence_df.sort_values(by=['Present'], ascending=False)
 
+if sort_by == 'column_%':
+    sorted_column_order = sorted_thr_rel_presence_absence_df['Presynaptic neuron'].tolist()
+
+
 #Neuron filter based on "presence_threshold"
 presence_threshold_neuron_filter = thr_rel_presence_absence_df['Presynaptic neuron'].tolist()
-presence_threshold_rank_column_order = [neuron for neuron in rank_column_order if neuron in presence_threshold_neuron_filter]
+
 
 
 ########################################## PRESENCE - ABSENCE of a partner ####################################
@@ -389,9 +405,9 @@ binary_df[binary_df.notnull()] = 1
 #binary_df[binary_df.isnull()] = 0 # Fo now, do not excecuto so that values remain NaN
 
 #sorting
-column_order = binary_df.sum().sort_values(ascending=False).index.tolist() # Sorting based on SUM of all values in the column
-binary_sum_sorted_df = binary_df[column_order] # swapping order of columns
-binary_rank_sorted_df = binary_df[rank_column_order] # swapping order of columns
+sum_column_order = binary_df.sum().sort_values(ascending=False).index.tolist() # Sorting based on SUM of all values in the column
+binary_sum_sorted_df = binary_df[sum_column_order] # swapping order of columns
+
 
 
 
@@ -467,6 +483,11 @@ popularity_neuron_based_on_count_percentatge_ls = syn_popularity_rel_df.aggregat
 print(popularity_neuron_based_on_count_percentatge_ls[0:last_input_neuron])
 
 
+if sort_by == 'median_rel_count':
+    rel_column_order = syn_popularity_rel_df.median().sort_values(ascending=False).index.tolist()
+    sorted_column_order = syn_popularity_rel_df.median().sort_values(ascending=False).index.tolist()
+
+
 ##########################################  ABSOLUTE SYNAPTIC COUNTS ##########################################
 ###############################################################################################################
 
@@ -534,6 +555,18 @@ syn_popularity_abs_df.index = syn_type_df.index.levels[0]
 popularity_abs_df = pd.DataFrame(popularity_abs_connections_dict)
 popularity_abs_df.index = type_df.index.levels[0]
 
+if sort_by == 'median_abs_count':
+    abs_column_order = syn_popularity_abs_df.median().sort_values(ascending=False).index.tolist()
+    sorted_column_order = syn_popularity_abs_df.median().sort_values(ascending=False).index.tolist()
+
+
+
+########################################## Defining sorting for plotting #####################################
+#############################################################################################################
+
+#Selecting for all neuron present in at least some proportion of columns (presence_threshold_neuron_filter) and keepind a certain order (sorted_column_order)
+
+presence_threshold_sorted_column_order = [neuron for neuron in sorted_column_order if neuron in presence_threshold_neuron_filter]
 
 
 
@@ -587,7 +620,7 @@ if plot_correlation:
     # Element-wise pearson correlation. Range: -1 to +1
 
     ###Not removing NaNs ( a very problematic case)
-    curr_df = syn_popularity_rel_df[presence_threshold_rank_column_order].copy() #  filtering based on " presence_threshold"
+    curr_df = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
     correlation_rel_df = curr_df.corr(method='pearson', min_periods=1)
     #Calculating p_values
     p_values_correlation_rel_df = calculate_pvalues(correlation_rel_df) 
@@ -602,7 +635,7 @@ if plot_correlation:
 
     ###Not removing NaNs ( a very problematic case)
     #TODO, >>>> WARNING!!!, check this filter for abs! Is it correct? 
-    curr_df = syn_popularity_abs_df[presence_threshold_rank_column_order].copy() #  filtering based on " presence_threshold"
+    curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
 
     correlation_abs_df = curr_df.corr(method='pearson', min_periods=1)
     #Calculating p_values
@@ -643,8 +676,8 @@ if plot_correlation:
 # Table for Coefficient of variation calculations
 
 #Consider filtering some columns (here presynaptic neurons) or indexes that are not interested
-curr_rel_stats_df  = syn_popularity_rel_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
-curr_abs_stats_df  = syn_popularity_abs_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
+curr_rel_stats_df  = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
+curr_abs_stats_df  = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
 #curr_rel_stats_df  = syn_popularity_rel_df.filter(regex='D', axis=0).copy() # Filterinf index base on name
 #curr_abs_stats_df  = syn_popularity_abs_df.filter(regex='D', axis=0).copy() # Filterinf index base on name
 
@@ -668,7 +701,7 @@ curr_abs_stats_df['mean'] = curr_abs_stats_df.mean(axis=1)
 
 #For relative counts:
 # Data
-rel_data = syn_popularity_rel_df[presence_threshold_rank_column_order].copy()
+rel_data = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()
 rel_data= rel_data.fillna(0)
 rel_data_array = rel_data.to_numpy(dtype=int,copy=True).T
 
@@ -688,7 +721,7 @@ rel_eigvecs = rel_eigvecs[:,k]
 
 #For absolute counts:
 # Data
-abs_data = syn_popularity_abs_df[presence_threshold_rank_column_order].copy()
+abs_data = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy()
 abs_data= abs_data.fillna(0)
 abs_data_array = abs_data.to_numpy(dtype=int,copy=True).T
 
@@ -715,12 +748,21 @@ abs_eigvecs = abs_eigvecs[:,k]
 
 ## Saving processed data
 if saving_processed_data:
-    
-
-    #Absolut counts
+    #Absolute count data frame
     file_name = f'{neuron_of_interest}_{dataset_name}.xlsx'
     savePath = os.path.join(output_dataPath, file_name)
     top_rank_popularity_abs_df.to_excel(savePath, sheet_name='Absolut_counts')
+
+    #Saving more dataframes in same excel file
+    from openpyxl import load_workbook
+    book = load_workbook(savePath)
+    writer = pd.ExcelWriter(savePath, engine = 'openpyxl')
+    writer.book = book
+    top_rank_popularity_rel_df.to_excel(writer, sheet_name='Relative_counts')
+    binary_df.to_excel(writer, sheet_name='Binary')
+    rank_df.to_excel(writer, sheet_name='Rank')
+    writer.save()
+    writer.close()
     print('Processed data saved')
     
 
@@ -771,13 +813,13 @@ axs[1].spines['top'].set_visible(False)
 # Next axis
 sorted_thr_rel_presence_absence_df['Presynaptic neuron_cat'] = pd.Categorical(
     sorted_thr_rel_presence_absence_df['Presynaptic neuron'], 
-    categories=presence_threshold_rank_column_order, 
+    categories=presence_threshold_sorted_column_order, 
     ordered=True
 )
 sorted_thr_rel_presence_absence_df.sort_values('Presynaptic neuron_cat', inplace = True)
 sorted_thr_rel_presence_absence_df.set_index('Presynaptic neuron').plot(kind='bar', stacked=True, color=[color_present, color_absent], 
                                                                     edgecolor = "black", ax = axs[2],legend=False)
-axs[2].set_title(f'{neuron_of_interest}, Presence / absence across columns above {presence_threshold}, syn>={desired_count}')
+axs[2].set_title(f'{neuron_of_interest}, Presence / absence across columns above {presence_threshold}, syn>={desired_count}, sorted by {sort_by}')
 #axs[2].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 axs[2].set_xlabel('Presynaptic neuron')
 axs[2].set_ylabel('% of columns')
@@ -787,7 +829,7 @@ axs[2].spines['top'].set_visible(False)
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Percentage_columns_partner_presence_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\Percentage_columns_partner_presence_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Percentatge across columns plotted and saved')
 plt.close(fig)
@@ -802,7 +844,7 @@ plt.close(fig)
 #Heatmap plots
 
 #Data filtering
-_data =binary_rank_sorted_df[presence_threshold_rank_column_order].copy()
+_data =binary_df[presence_threshold_sorted_column_order].copy()
 
 #Figure
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
@@ -810,27 +852,27 @@ _palette = sns.color_palette(hex_color, as_cmap=True)
 
 heatmap = sns.heatmap(cmap =_palette, data = _data, vmin=0, vmax=1, linewidths=0.2,
                 linecolor='k', cbar=False, ax = axs, square=True) 
-axs.set_title(f'{neuron_of_interest}, Binary: presence - absence, rank sorted, syn>={desired_count}')
+axs.set_title(f'{neuron_of_interest}, Binary: presence - absence, syn>={desired_count}, sorted by {sort_by}')
 axs.set_ylabel('Column')
 axs.set_xlabel('Presynaptic neuron')
 
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
-# Add ticks in the Y-axis for each row in "binary_rank_sorted_df"
+# Add ticks in the Y-axis for each row in "binary_df[presence_threshold_sorted_column_order]"
 axs.set_yticks(range(len(_data.index)))
 axs.set_yticklabels(_data.index)
 
 if save_figures:
     # Quick plot saving
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Binary-heatmap-presence-absence-partner_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\Binary-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Binary heatmap plotted and saved')
 plt.close(fig)
@@ -845,7 +887,7 @@ plt.close(fig)
 color_palette_name = "tab10" # "magma", "rocket", "tab10", "plasma", , "viridis", "flare"
 
 #Data filtering
-curr_df = counting_instances_df.T[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
+curr_df = counting_instances_df.T[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
 
 #Sorting based on max, sum and count
 column_order = curr_df.max().sort_values(ascending=False).index.tolist() # Sorting based on MAX of all values in the column
@@ -856,7 +898,7 @@ column_order = curr_df.count().sort_values(ascending=False).index.tolist() # Sor
 curr_count_sorted_df = curr_df[column_order] # swapping order of columns
 
 #Sorting based on rank
-curr_rank_sorted_df = counting_instances_df.T[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
+curr_rank_sorted_df = counting_instances_df.T[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
 curr_rank_sorted_df[presence_threshold_neuron_filter]
 
 
@@ -870,18 +912,18 @@ _palette = sns.color_palette(color_palette_name,max_count)
 
 #Plot
 heatmap = sns.heatmap(cmap=_palette, data=_data, vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, Instance count, sorted by rank, syn>={desired_count}')
+axs.set_title(f'{neuron_of_interest}, Instance count, syn>={desired_count}, sorted by {sort_by}')
 axs.set_ylabel('Columns')
 axs.set_xlabel('Presynaptic neurons')
 
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
@@ -895,7 +937,7 @@ axs.set_xticklabels(_data.columns)
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-vertical.pdf'
+    figure_title = f'\Instance-count_{dataset_name}_{neuron_of_interest}_{sort_by}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of instance counts plotted vertically and saved')
 plt.close(fig)
@@ -909,7 +951,7 @@ _palette = sns.color_palette(color_palette_name, max_count)
 
 # Plot (rotated 90 degrees)
 heatmap = sns.heatmap(cmap=_palette, data=_data.transpose(), vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, Instance count, sorted by rank, syn>={desired_count}')
+axs.set_title(f'{neuron_of_interest}, Instance count, syn>={desired_count}, sorted by {sort_by}')
 axs.set_xlabel('Columns')
 axs.set_ylabel('Presynaptic neurons')
 
@@ -917,11 +959,11 @@ axs.set_ylabel('Presynaptic neurons')
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
@@ -935,7 +977,7 @@ axs.set_xticklabels(_data.transpose().columns)
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots' # r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Presynaptic-instance-count-per-column-sorted_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
+    figure_title = f'\Instance-count_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of instance counts plotted horizontally and saved')
 plt.close(fig)
@@ -944,21 +986,26 @@ plt.close(fig)
 ################################################ RELATIVE  COUNTS  ##############################################
 # Visualization of presynaptic contact percentatge for all columns
 #Heatmap of presynaptic partners  colorcoded by relative synaptic count
-
+import math
+def roundup(x):
+    return math.ceil(x / 10.0) * 10
+from matplotlib.ticker import MultipleLocator
 
 #Data
-_data = top_rank_popularity_rel_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
-
+_data = top_rank_popularity_rel_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
+_vmin = desired_count
+_vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
+bin_width = 3# 5
+_palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width)) # n_colors=int(roundup(max(_data.max()))/bin_width)
 
 #Figure
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm)) #figsize=(20*cm, 40*cm)), figsize=(40*cm, 80*cm))
-#_palette = sns.color_palette("rocket",n_colors=20)
-_palette = sns.color_palette("gist_ncar",n_colors=20)
+
 
 #First axis
 
-sns.heatmap(cmap = _palette, vmin=0, vmax=50, data = _data, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, count %, rank-sorted (syn>={desired_count})')
+sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+axs.set_title(f'{neuron_of_interest}, count %, (syn>={desired_count}), sorted by {sort_by}')
 axs.set_ylabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_xlabel('Presynaptic neuron')
@@ -966,11 +1013,11 @@ axs.set_xlabel('Presynaptic neuron')
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
@@ -981,28 +1028,29 @@ axs.set_yticklabels(_data.index)
 axs.set_xticks(range(len(_data.columns)))
 axs.set_xticklabels(_data.columns)
 
+# Modify the legend ticks
+cbar = axs.collections[0].colorbar
+cbar.set_ticks(range(_vmin, _vmax + bin_width, bin_width))
+
+
+
 
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Relative-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-vertical.pdf'
+    figure_title = f'\Relative-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of relative counts plotted vertically and saved')
 plt.close(fig)
 
 
-
-
 #Figure
 fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
-#_palette = sns.color_palette("rocket",n_colors=20)
-_palette = sns.color_palette("gist_ncar",n_colors=20)
 
 #First axis
-
 # Plot (rotated 90 degrees)
-sns.heatmap(cmap = _palette, vmin=0, vmax=50, data = _data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, count %, rank-sorted (syn>={desired_count})')
+sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+axs.set_title(f'{neuron_of_interest}, count %, (syn>={desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron')
@@ -1010,11 +1058,11 @@ axs.set_ylabel('Presynaptic neuron')
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
@@ -1024,11 +1072,15 @@ axs.set_yticklabels(_data.transpose().index)
 axs.set_xticks(range(len(_data.transpose().columns)))
 axs.set_xticklabels(_data.transpose().columns)
 
+# Modify the legend ticks
+cbar = axs.collections[0].colorbar
+cbar.set_ticks(range(_vmin, _vmax + bin_width, bin_width))
+
 
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Relative-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
+    figure_title = f'\Relative-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of relative counts plotted horizontally and saved')
 plt.close(fig)
@@ -1041,18 +1093,20 @@ plt.close(fig)
 
 
 #Data
-_data = top_rank_popularity_abs_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
-
+_data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
+_vmin = desired_count
+_vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
+bin_width = 3# 5
+_palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width))
 
 #Figure
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm)) #figsize=(20*cm, 40*cm)), figsize=(40*cm, 80*cm))
-#_palette = sns.color_palette("rocket",n_colors=20)
-_palette = sns.color_palette("gist_ncar",n_colors=20)
+
 
 #First axis
 
-sns.heatmap(cmap = _palette, vmin=0, vmax=50, data = _data, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, absolute count, rank-sorted (syn>={desired_count})')
+sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={desired_count}), sorted by {sort_by}')
 axs.set_ylabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_xlabel('Presynaptic neuron')
@@ -1060,11 +1114,11 @@ axs.set_xlabel('Presynaptic neuron')
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
@@ -1075,11 +1129,15 @@ axs.set_yticklabels(_data.index)
 axs.set_xticks(range(len(_data.columns)))
 axs.set_xticklabels(_data.columns)
 
+# Modify the legend ticks
+cbar = axs.collections[0].colorbar
+cbar.set_ticks(range(_vmin, _vmax + bin_width, bin_width))
+
 
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Absolute-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-vertical.pdf'
+    figure_title = f'\Absolute-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of absolute counts plotted vertically and saved')
 plt.close(fig)
@@ -1087,14 +1145,11 @@ plt.close(fig)
 
 #Figure
 fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
-#_palette = sns.color_palette("rocket",n_colors=20)
-_palette = sns.color_palette("gist_ncar",n_colors=20)
 
 #First axis
-
 # Plot (rotated 90 degrees)
-sns.heatmap(cmap = _palette, vmin=0, vmax=50, data = _data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, absolute count, rank-sorted (syn>={desired_count})')
+sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron')
@@ -1102,11 +1157,11 @@ axs.set_ylabel('Presynaptic neuron')
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
@@ -1116,11 +1171,15 @@ axs.set_yticklabels(_data.transpose().index)
 axs.set_xticks(range(len(_data.transpose().columns)))
 axs.set_xticklabels(_data.transpose().columns)
 
+# Modify the legend ticks
+cbar = axs.collections[0].colorbar
+cbar.set_ticks(range(_vmin, _vmax + bin_width, bin_width))
+
 
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Absolute-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
+    figure_title = f'\Absolute-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of absolute counts plotted horizontally and saved')
 plt.close(fig)
@@ -1133,16 +1192,8 @@ plt.close(fig)
 
 
 #Data
-curr_df = top_rank_df[['rank', 'type_pre', 'instance_post' ]].copy()
-#Removing type_pre duplicates for each "instance_post" and recalculating rank
-curr_df = curr_df.groupby('instance_post').apply(lambda x: x.drop_duplicates(subset='type_pre')).reset_index(drop=True).copy()
-curr_df['rank'] = curr_df.groupby('instance_post').cumcount()
-total_num_ranks = curr_df['rank'].max() + 1
-curr_df.set_index('instance_post', inplace = True)
-curr_df = curr_df.pivot_table(values='rank', index=curr_df.index, columns='type_pre', aggfunc='first').copy()
-_data = curr_df[presence_threshold_rank_column_order].copy()#  filtering based on " presence_threshold"
-
-
+_data = rank_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
+total_num_ranks = int(max(_data.max()))
 
 #Figure 
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm)) #figsize=(20*cm, 40*cm)), figsize=(40*cm, 80*cm))
@@ -1151,7 +1202,7 @@ _palette = sns.color_palette("tab20",n_colors=total_num_ranks)
 
 #First axis
 sns.heatmap(cmap = _palette, vmin=0, vmax=total_num_ranks, cbar_kws={"ticks":list(range(1,top_rank_df['rank'].max()+2,1)),"shrink": 0.25}, data = _data, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={desired_count})')
+axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={desired_count}), sorted by {sort_by}')
 axs.set_ylabel('Column')
 #axes.set_yticklabels(id_column)
 axs.set_xlabel('Presynaptic neuron')
@@ -1159,11 +1210,11 @@ axs.set_xlabel('Presynaptic neuron')
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.index)))
@@ -1177,7 +1228,7 @@ axs.set_xticklabels(_data.columns)
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Rank-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-vertical.pdf'
+    figure_title = f'\Rank-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-vertical.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of ranks plotted vertically and saved')
 
@@ -1192,7 +1243,7 @@ _palette = sns.color_palette("tab20",n_colors=total_num_ranks)
 
 #First axis
 sns.heatmap(cmap = _palette, vmin=0, vmax=total_num_ranks, cbar_kws={"ticks":list(range(1,top_rank_df['rank'].max()+2,1)),"shrink": 0.25}, data = _data.transpose(), ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={desired_count})')
+axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column')
 #axes.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron')
@@ -1200,11 +1251,11 @@ axs.set_ylabel('Presynaptic neuron')
 
 # Reducing font size of x-axis tick labels
 for tick_label in heatmap.get_xticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
 
 # Reducing font size of y-axis tick labels
 for tick_label in heatmap.get_yticklabels():
-    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
 
 # Add ticks in the Y-axis for each row in "_data"
 axs.set_yticks(range(len(_data.transpose().index)))
@@ -1217,10 +1268,117 @@ axs.set_xticklabels(_data.transpose().columns)
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Rank-connectivity-heatmap-across-columns_{dataset_name}_{neuron_of_interest}-horizontal.pdf'
+    figure_title = f'\Rank-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of ranks plotted horizontally and saved')
 plt.close(fig)
+
+
+#%% 
+############################################### STACKED BAR - PLOTS ############################################
+################################################################################################################
+from matplotlib.collections import PatchCollection
+import matplotlib.patches as mpatches
+
+################################# Binary, absolute counts and rank together ####################################
+
+#Figure
+fig, axs = plt.subplots(nrows =1, ncols = 3, figsize = (40*cm, 15*cm))
+fig.tight_layout(pad=10) # Adding some space between subplots
+
+
+# First axis: Absolute counts
+
+# Data
+_data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
+# Binning the data
+bin_width = 5
+binned_data = np.floor(_data / bin_width) * bin_width
+# Setting limits and colors
+_vmin = desired_count
+_vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
+bin_width = 3# 5
+_palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width))
+
+# Get unique values across all columns
+unique_values = np.unique(binned_data.T.values)
+# Determine the colors for each unique value
+colors = _palette[:len(unique_values)]
+# Calculate the value counts for each column
+value_counts = binned_data.apply(lambda x: x.value_counts())
+# Plot the stacked bar chart
+value_counts.T.plot(kind='bar', stacked=True, color=colors, legend=False, figsize=(10, 20), ax = axs[0])
+# Set the x-axis and y-axis labels
+axs[0].set_xlabel('Presynaptic neuron')
+axs[0].set_ylabel('Count of absolut counts')
+# Set the x-axis tick labels
+axs[0].set_xticklabels(value_counts.T.index, rotation=90)
+# Set the plot title
+axs[0].set_title(f'{neuron_of_interest}, absolute-count counts, (syn>={desired_count}), sorted by {sort_by}')
+# Remove spines
+axs[0].spines['right'].set_visible(False)
+axs[0].spines['top'].set_visible(False)
+
+# Create legend patches with bin width labels 
+# legend_patches = [
+#     mpatches.Patch(facecolor=color, label=f'{int(value)}-{int(value+bin_width)}' if not np.isnan(value) else '')
+#     for color, value in zip(colors, unique_values)
+# ]
+# # Add the modified legend, excluding blanks from the labels
+# axs[0].legend(handles=legend_patches, title='Binned Values', bbox_to_anchor=(1.05, 1)) #  loc='upper right'
+
+# Next axis: Ranks
+# Data
+_data = rank_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
+_palette = sns.color_palette("tab20",n_colors=total_num_ranks)
+# Determine the colors for each unique value
+colors = _palette[:len(unique_values)]
+# Calculate the value counts for each column
+value_counts = _data.apply(lambda x: x.value_counts())
+# Plot the stacked bar chart
+value_counts.T.plot(kind='bar', stacked=True, color=colors, legend=False, figsize=(10, 20), ax = axs[1])
+# Set the x-axis and y-axis labels
+axs[1].set_xlabel('Presynaptic neuron')
+axs[1].set_ylabel('Rank counts')
+# Set the x-axis tick labels
+axs[1].set_xticklabels(value_counts.T.index, rotation=90)
+# Set the plot title
+axs[1].set_title(f'{neuron_of_interest}, Rank counts, (syn>={desired_count}), sorted by {sort_by}')
+# Remove spines
+axs[1].spines['right'].set_visible(False)
+axs[1].spines['top'].set_visible(False)
+
+
+# Next axis: binary data
+sorted_thr_rel_presence_absence_df['Presynaptic neuron_cat'] = pd.Categorical(
+    sorted_thr_rel_presence_absence_df['Presynaptic neuron'], 
+    categories=presence_threshold_sorted_column_order, 
+    ordered=True
+)
+sorted_thr_rel_presence_absence_df.sort_values('Presynaptic neuron_cat', inplace = True)
+sorted_thr_rel_presence_absence_df.set_index('Presynaptic neuron').plot(kind='bar', stacked=True, color=[color_present, color_absent], 
+                                                                    edgecolor = "black", ax = axs[2],legend=False)
+axs[2].set_title(f'{neuron_of_interest}, Presence above {int(presence_threshold*100)}%, syn>={desired_count}, sorted by {sort_by}')
+#axs[2].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+axs[2].set_xlabel('Presynaptic neuron')
+axs[2].set_ylabel('% of columns')
+# Remove spines
+axs[2].spines['right'].set_visible(False)
+axs[2].spines['top'].set_visible(False)
+
+
+
+#Plot saving
+if save_figures:
+    save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
+    figure_title = f'\Stacked-bar-plots_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of absolute counts plotted as stacked bars and saved')
+plt.close(fig)
+
+
+
+################################################# NEURONAL RANK  ##############################################
 
 
 
@@ -1283,7 +1441,7 @@ if plot_correlation:
 # Relative and absolute counts across columns
 
 # Data
-_data = syn_popularity_rel_df.copy()[presence_threshold_rank_column_order]#  filtering based on " presence_threshold"
+_data = syn_popularity_rel_df.copy()[presence_threshold_sorted_column_order]#  filtering based on " presence_threshold"
 
 #Figure
 fig, axs = plt.subplots(nrows=2,ncols=1,figsize=(30*cm, 30*cm))
@@ -1292,24 +1450,24 @@ fig.tight_layout(pad=10) # Adding some space between subplots
 
 # First axes 
 
-sns.boxplot(data = _data[_data.max().sort_values(ascending = False).index], ax = axs[0]) 
-axs[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={desired_count})')
+sns.boxplot(data = _data, ax = axs[0])  # old sorting: _data[_data.max().sort_values(ascending = False).index]
+axs[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={desired_count}), sorted by {sort_by}')
 axs[0].set_ylabel('Synaptic count (%) ', size = 12)
 axs[0].set_xlabel('Presynaptic neuron', size = 12)
-axs[0].set_xticklabels(_data[_data.max().sort_values(ascending = False).index], rotation=90, size = 10)
+axs[0].set_xticklabels(_data, rotation=90, size = 10) # old sorting: _data[_data.max().sort_values(ascending = False).index]
 axs[0].set_yticklabels(axs[0].get_yticks(), size = 8)
 sns.despine(left=False, bottom=False)
 
 
 # Data
-_data = syn_popularity_abs_df.copy()[presence_threshold_rank_column_order]#  filtering based on " presence_threshold"
+_data = syn_popularity_abs_df.copy()[presence_threshold_sorted_column_order]#  filtering based on " presence_threshold"
 
 # Next axes 
-sns.boxplot(data = _data[_data.max().sort_values(ascending = False).index], ax = axs[1]) 
-axs[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={desired_count})')
+sns.boxplot(data = _data, ax = axs[1]) # old sorting: _data[_data.max().sort_values(ascending = False).index]
+axs[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={desired_count}), sorted by {sort_by}')
 axs[1].set_ylabel('Synaptic count', size = 12)
 axs[1].set_xlabel('Presynaptic neuron', size = 12)
-axs[1].set_xticklabels(_data[_data.max().sort_values(ascending = False).index], rotation=90, size = 10)
+axs[1].set_xticklabels(_data, rotation=90, size = 10) # old sorting: _data[_data.max().sort_values(ascending = False).index]
 axs[1].set_yticklabels(axs[1].get_yticks(), size = 8)
 sns.despine(left=False, bottom=False)
 
@@ -1317,7 +1475,7 @@ sns.despine(left=False, bottom=False)
 #Plot saving
 if save_figures:
     save_path =  r'D:\Connectomics-Data\FlyWire\Pdf-plots' #r'C:\Users\sebas\Documents\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Box-plot-presynaptic-partners_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\Box-plot-presynaptic-partners_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of presynaptic partners contacts')
 plt.close(fig)
@@ -1335,13 +1493,13 @@ fig, axs = plt.subplots(nrows=2,ncols=2,figsize=(30*cm, 15*cm))
 fig.tight_layout(pad=8) # Adding some space between subplots
 
 #Data
-_data = curr_rel_stats_df.round(2).copy() 
+_data = curr_rel_stats_df.round(2).copy()[presence_threshold_sorted_column_order+['mean']]#  filtering based on " presence_threshold"
 
 
 #First axis
 sns.barplot(data = _data.iloc[[2]], ax = axs[0,0] )
 axs[0,0].axhline(y = _data.iloc[[2]]['mean'][0], color = 'k', linestyle = 'dashed')  
-axs[0,0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={desired_count})')
+axs[0,0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={desired_count}), sorted by {sort_by}')
 axs[0,0].set_ylabel(_data.index[2], size = 10)
 axs[0,0].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[0,0].set_xticklabels(_data.iloc[[2]], rotation=90)
@@ -1355,7 +1513,7 @@ sns.despine(left=False, bottom=False)
 #First axis
 sns.barplot(data = _data.iloc[[-1]], ax = axs[0,1] )
 axs[0,1].axhline(y = _data.iloc[[-1]]['mean'][0], color = 'k', linestyle = 'dashed')  
-axs[0,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={desired_count})')
+axs[0,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={desired_count}), sorted by {sort_by}')
 axs[0,1].set_ylabel(_data.index[-1], size = 10)
 axs[0,1].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[0,1].set_xticklabels(_data.iloc[[-1]], rotation=90)
@@ -1366,12 +1524,12 @@ sns.despine(left=False, bottom=False)
 
 
 #Data
-_data = curr_abs_stats_df.copy() 
+_data = curr_abs_stats_df.round(2).copy()[presence_threshold_sorted_column_order+['mean']]#  filtering based on " presence_threshold"
 
 #Next axis
 sns.barplot(data = _data.iloc[[2]], ax = axs[1,0] )
 axs[1,0].axhline(y = _data.iloc[[2]]['mean'][0], color = 'k', linestyle = 'dashed')  
-axs[1,0].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={desired_count})')
+axs[1,0].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={desired_count}), sorted by {sort_by}')
 axs[1,0].set_ylabel(_data.index[2], size = 10)
 axs[1,0].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[1,0].set_xticklabels(_data.iloc[[2]], rotation=90)
@@ -1383,7 +1541,7 @@ sns.despine(left=False, bottom=False)
 #Next axis
 sns.barplot(data = _data.iloc[[-1]], ax = axs[1,1] )
 axs[1,1].axhline(y = _data.iloc[[-1]]['mean'][0], color = 'k', linestyle = 'dashed')  
-axs[1,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={desired_count})')
+axs[1,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={desired_count}), sorted by {sort_by}')
 axs[1,1].set_ylabel(_data.index[-1], size = 10)
 axs[1,1].set_xlabel(f'Presynaptic neuron', size = 10)
 axs[1,1].set_xticklabels(_data.iloc[[-1]], rotation=90)
@@ -1396,7 +1554,7 @@ sns.despine(left=False, bottom=False)
 #Plot saving
 if save_figures:
     save_path = r'D:\Connectomics-Data\FlyWire\Pdf-plots'
-    figure_title = f'\Variability-measures_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\Variability-measures_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of variability measures')
 plt.close(fig)
@@ -1520,6 +1678,7 @@ plt.close(fig)
 ################################################ BINARY COUNTs ###############################################
 #Plotting a single neuron
 
+_data = binary_df[presence_threshold_sorted_column_order] # FIlter abnd sorting
 
 #Gettting the center point in specific neuropile from database
 xyz_neuropil = 'XYZ-ME'
@@ -1533,7 +1692,7 @@ xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 pre_partner = 'Tm16'
 
 #Dot sizes
-dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+dot_sizes = _data[pre_partner].fillna(0).tolist()
 dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
 dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
 
@@ -1563,8 +1722,11 @@ ax.elev = mesh_elev
 from matplotlib.backends.backend_pdf import PdfPages
 from mpl_toolkits.mplot3d import Axes3D
 
+# Data
+_data = binary_df[presence_threshold_sorted_column_order] # FIlter abnd sorting
+
 # Assuming pre_partner_list is a list of objects to be plotted
-pre_partner_list = binary_rank_sorted_df.columns.tolist()
+pre_partner_list = _data.columns.tolist()
 OL_R = flywire.get_neuropil_volumes([mesh_ME])
 
 # Create a PDF file to save the plots
@@ -1604,7 +1766,7 @@ if num_plots == 1:
 # Loop through the objects and create subplots
 for i, (pre_partner, ax) in enumerate(zip(pre_partner_list, axes.flatten())):
     # Generate the plot for the current object
-    dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+    dot_sizes = _data[pre_partner].fillna(0).tolist()
     dot_sizes_ME = [size * 5 for size in dot_sizes]  # Increase size by a factor of X
 
     # Plot the object
@@ -1801,7 +1963,10 @@ def non_match_elements(list_a, list_b):
 
 # from matplotlib.backends.backend_pdf import PdfPages
 # # Assuming pre_partner_list is a list of objects to be plotted
-# pre_partner_list = binary_rank_sorted_df.columns.tolist()
+# Data
+# _data = binary_df[presence_threshold_sorted_column_order] # FIlter abnd sorting
+
+# pre_partner_list = _data.columns.tolist()
 # OL_R = flywire.get_neuropil_volumes(['ME_R']) #['ME_R','LO_R','LOP_R']
 
 
@@ -1814,7 +1979,7 @@ def non_match_elements(list_a, list_b):
 # # Loop through the objects and create subplots
 # for i, pre_partner in enumerate(pre_partner_list):
 #     # Generate the plot for the current object
-#     dot_sizes = binary_rank_sorted_df[pre_partner].fillna(0).tolist()
+#     dot_sizes = _data[pre_partner].fillna(0).tolist()
 #     dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
 #     dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
 
@@ -1857,10 +2022,10 @@ def non_match_elements(list_a, list_b):
 # num_clusters = 2
 
 # #Defining range of neurons (featured) to plot based on rank (defining the subset for the PCA)
-# features = presence_threshold_rank_column_order # filtering based on " presence_threshold"
+# features = presence_threshold_sorted_column_order # filtering based on " presence_threshold"
 
 # #Get the features data
-# curr_rel_df = syn_popularity_rel_df[presence_threshold_rank_column_order].copy()
+# curr_rel_df = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()
 # curr_rel_df_no_NaNs = curr_rel_df.fillna(0).copy() #replacing NaNs with zero
 # rel_data = curr_rel_df_no_NaNs[features].copy()
 
@@ -1887,10 +2052,10 @@ def non_match_elements(list_a, list_b):
 # num_clusters = 2
 
 # #Defining range of neurons (featured) to plot based on rank (defining the subset for the PCA)
-# features = presence_threshold_rank_column_order # filtering based on " presence_threshold"
+# features = presence_threshold_sorted_column_order # filtering based on " presence_threshold"
 
 # #Get the features data
-# curr_abs_df = syn_popularity_abs_df[presence_threshold_rank_column_order].copy()
+# curr_abs_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy()
 # curr_abs_df_no_NaNs = curr_abs_df.fillna(0).copy() #replacing NaNs with zero
 # abs_data = curr_abs_df_no_NaNs[features].copy()
 
