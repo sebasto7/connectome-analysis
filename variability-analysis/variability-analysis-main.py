@@ -50,12 +50,11 @@ cm = 1/2.54  # centimeters in inches
 sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%'
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
-category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
+category_column = 'hemisphere'# 'dorso-ventral', 'hemisphere'
 color_cat_set = "Set1" # select a set for a seaborn color palette
 
 #YES NO options
 save_figures = True
-plot_correlation = True # FIxed, remove if statement
 exclude_outliers = True # Plot variability without outliers
 
 #%% 
@@ -84,18 +83,18 @@ selection_area = ''
 
 #Analysis of heterogeneous partners only:
 discard_homogeneous = True # To analyse all partnes, make it False
-thr_homogenous = 0.90 # Threshold about which a partner is defined as homogenous (e.g presnet in 75% of the columns)
+thr_homogenous = 0.75 # Threshold about which a partner is defined as homogenous (e.g presnet in 75% of the columns)
 
 #Data set 
 optic_lobe = 'R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
 mesh_ME = 'ME_L' #
 mesh_LO = 'LO_L' #
-mesh_azim =16# -18 for ME_R, 16 for ME_L
+mesh_azim = 16# -18 for ME_R, 16 for ME_L
 mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
-dots_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
+neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 
@@ -687,87 +686,85 @@ for partner, curr_ExM_df in ExM_absolut_counts.items(): # for all neurons in ExM
 ##############################################################################################################
 
 # Calculating statitstical significance for all correlations
-if plot_correlation:
-    #Function:
-    def calculate_pvalues(df):
-        dfcols = pd.DataFrame(columns=df.columns)
-        pvalues = dfcols.transpose().join(dfcols, how='outer')
-        for r in df.columns:
-            for c in df.columns:
+#Function:
+def calculate_pvalues(df):
+    dfcols = pd.DataFrame(columns=df.columns)
+    pvalues = dfcols.transpose().join(dfcols, how='outer')
+    for r in df.columns:
+        for c in df.columns:
                 
-                tmp = df[df[r].notnull() & df[c].notnull()]
-                try:
-                    pvalues[r][c] = round(pearsonr(tmp[r], tmp[c])[1], 4)
-                except:
-                    pvalues[r][c] = 1.0 # For cases in which no correlation was possible.
-                    print(f'No correlation possible between: {r} and {c}')
+            tmp = df[df[r].notnull() & df[c].notnull()]
+            try:
+                pvalues[r][c] = round(pearsonr(tmp[r], tmp[c])[1], 4)
+            except:
+                pvalues[r][c] = 1.0 # For cases in which no correlation was possible.
+                print(f'No correlation possible between: {r} and {c}')
 
-        return pvalues
+    return pvalues
     
+# Correlation across columns between pair of neurons
+# # Element-wise pearson correlation. Range: -1 to +1
 
-    # Correlation across columns between pair of neurons
-    # Element-wise pearson correlation. Range: -1 to +1
+###Not removing NaNs ( a very problematic case)
+curr_df = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+correlation_rel_df = curr_df.corr(method='pearson', min_periods=1)
+#Calculating p_values
+p_values_correlation_rel_df = calculate_pvalues(correlation_rel_df) 
+p_values_correlation_rel_df_asterix_df = p_values_correlation_rel_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
 
-    ###Not removing NaNs ( a very problematic case)
-    curr_df = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
-    correlation_rel_df = curr_df.corr(method='pearson', min_periods=1)
-    #Calculating p_values
-    p_values_correlation_rel_df = calculate_pvalues(correlation_rel_df) 
-    p_values_correlation_rel_df_asterix_df = p_values_correlation_rel_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
-
-    ###Same but replacing NaNs with zeros (The logic thing to do. NaN means actually no connection, so zero is find)
-    curr_df = curr_df.fillna(0).copy()
-    correlation_rel_no_NaN_df = curr_df.corr(method='pearson', min_periods=1)
-    #Calculating p_values
-    p_values_correlation_rel_no_NaN_df = calculate_pvalues(correlation_rel_no_NaN_df) 
-    p_values_correlation_rel_no_NaN_df_asterix_df = p_values_correlation_rel_no_NaN_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
+###Same but replacing NaNs with zeros (The logic thing to do. NaN means actually no connection, so zero is find)
+curr_df = curr_df.fillna(0).copy()
+correlation_rel_no_NaN_df = curr_df.corr(method='pearson', min_periods=1)
+#Calculating p_values
+p_values_correlation_rel_no_NaN_df = calculate_pvalues(correlation_rel_no_NaN_df) 
+p_values_correlation_rel_no_NaN_df_asterix_df = p_values_correlation_rel_no_NaN_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
 
 
-    ###Not removing NaNs ( a very problematic case) 
-    curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+###Not removing NaNs ( a very problematic case) 
+curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
 
-    correlation_abs_df = curr_df.corr(method='pearson', min_periods=1)
-    #Calculating p_values
-    p_values_correlation_abs_df = calculate_pvalues(correlation_abs_df) 
-    p_values_correlation_abs_df_asterix_df = p_values_correlation_abs_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
+correlation_abs_df = curr_df.corr(method='pearson', min_periods=1)
+#Calculating p_values
+p_values_correlation_abs_df = calculate_pvalues(correlation_abs_df) 
+p_values_correlation_abs_df_asterix_df = p_values_correlation_abs_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
 
-    ###Same but replacing NaNs with zeros (The logic thing to do. NaN means actually no connection, so zero is find)
-    curr_df = curr_df.fillna(0).copy()
-    correlation_abs_no_NaN_df = curr_df.corr(method='pearson', min_periods=1)
-    p_values_correlation_abs_no_NaN_df = calculate_pvalues(correlation_abs_no_NaN_df) 
-    p_values_correlation_abs_no_NaN_df_asterix_df = p_values_correlation_abs_no_NaN_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
+###Same but replacing NaNs with zeros (The logic thing to do. NaN means actually no connection, so zero is find)
+curr_df = curr_df.fillna(0).copy()
+correlation_abs_no_NaN_df = curr_df.corr(method='pearson', min_periods=1)
+p_values_correlation_abs_no_NaN_df = calculate_pvalues(correlation_abs_no_NaN_df) 
+p_values_correlation_abs_no_NaN_df_asterix_df = p_values_correlation_abs_no_NaN_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
 
-    #Hierarchical clustering for correlations
-    # Perform hierarchical clustering
-    dendrogram_pearson = hierarchy.linkage(correlation_abs_no_NaN_df.to_numpy(), method='ward')
-    pearson_order = hierarchy.leaves_list(dendrogram_pearson)
-    # Create a new DataFrame with reordered rows and columns
-    correlation_abs_no_NaN_reordered = correlation_abs_no_NaN_df.iloc[pearson_order].copy()
-    correlation_abs_no_NaN_reordered = correlation_abs_no_NaN_reordered.iloc[:,pearson_order].copy()
-    # Calculate cosine similarity
-    pearson_abs_reordered = cosine_similarity(correlation_abs_no_NaN_reordered.values)
+#Hierarchical clustering for correlations
+# Perform hierarchical clustering
+dendrogram_pearson = hierarchy.linkage(correlation_abs_no_NaN_df.to_numpy(), method='ward')
+pearson_order = hierarchy.leaves_list(dendrogram_pearson)
+# Create a new DataFrame with reordered rows and columns
+correlation_abs_no_NaN_reordered = correlation_abs_no_NaN_df.iloc[pearson_order].copy()
+correlation_abs_no_NaN_reordered = correlation_abs_no_NaN_reordered.iloc[:,pearson_order].copy()
+# Calculate cosine similarity
+pearson_abs_reordered = cosine_similarity(correlation_abs_no_NaN_reordered.values)
     
     
-    # Some sorting based on correlation values
-    #For relative counts
-    column_order = correlation_rel_no_NaN_df.sum().sort_values(ascending=False).index.tolist() # new column order based on sum (it will create a gradien from most-correlated to most.anticorrelated)
-    sorted_correlation_rel_no_NaN_df= correlation_rel_no_NaN_df[column_order] # swpapping columns
-    sorted_p_values_correlation_rel_no_NaN_df_asterix_df = p_values_correlation_rel_no_NaN_df_asterix_df[column_order]  # swpapping columns
+# Some sorting based on correlation values
+#For relative counts
+column_order = correlation_rel_no_NaN_df.sum().sort_values(ascending=False).index.tolist() # new column order based on sum (it will create a gradien from most-correlated to most.anticorrelated)
+sorted_correlation_rel_no_NaN_df= correlation_rel_no_NaN_df[column_order] # swpapping columns
+sorted_p_values_correlation_rel_no_NaN_df_asterix_df = p_values_correlation_rel_no_NaN_df_asterix_df[column_order]  # swpapping columns
 
-    #For absolute counts
-    column_order = correlation_abs_no_NaN_df.sum().sort_values(ascending=False).index.tolist() # new column order based on sum (it will create a gradien from most-correlated to most.anticorrelated)
-    sorted_correlation_abs_no_NaN_df= correlation_abs_no_NaN_df[column_order] # swpapping columns
-    sorted_p_values_correlation_abs_no_NaN_df_asterix_df = p_values_correlation_abs_no_NaN_df_asterix_df[column_order]  # swpapping columns
+#For absolute counts
+column_order = correlation_abs_no_NaN_df.sum().sort_values(ascending=False).index.tolist() # new column order based on sum (it will create a gradien from most-correlated to most.anticorrelated)
+sorted_correlation_abs_no_NaN_df= correlation_abs_no_NaN_df[column_order] # swpapping columns
+sorted_p_values_correlation_abs_no_NaN_df_asterix_df = p_values_correlation_abs_no_NaN_df_asterix_df[column_order]  # swpapping columns
 
 
-    # Removing the +1 correlated diagonal (setting it to NaN)
-    #For relative counts
-    correlation_rel_no_NaN_df.replace(1.0, np.NaN, inplace = True)
-    sorted_correlation_rel_no_NaN_df.replace(1.0, np.NaN, inplace = True)
+# Removing the +1 correlated diagonal (setting it to NaN)
+#For relative counts
+correlation_rel_no_NaN_df.replace(1.0, np.NaN, inplace = True)
+sorted_correlation_rel_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 
-    #For absolute coutns
-    correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
-    sorted_correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
+#For absolute coutns
+correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
+sorted_correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 
 
 ############################################   COSINE SIMILARITY    ###########################################
@@ -814,6 +811,11 @@ cosine_sim_df['dorso-ventral'] = d_v_list
 # Perform hierarchical clustering
 dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
 cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
+
+#TODO: define clusters based on branches of the dendogram using one of the options:
+# - Elbow Method
+# - Gap Statistic
+# - Silhouette Analysis
 
 # Create a new DataFrame with reordered rows and columns
 _data_reordered = _data.iloc[cosine_row_order].copy()
@@ -1319,10 +1321,94 @@ axs[1, 1].set_xticklabels(categories)
 if save_figures:
     # Quick plot saving
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Comparision-in_{dataset_name}_{neuron_of_interest}_by_{category_column}.pdf'
+    figure_title = f'\Counts-and-similarity-in_{dataset_name}_{neuron_of_interest}_by_{category_column}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Box-plots comparing categories')
 plt.close(fig)
+
+
+#%% 
+########################################  SCATTER PLOTS - BY CATEGORY ######################################
+#############################################    CORRELATIONS   ############################################
+
+## TOTAL NUMBER OF SYNAPTIC COUNTS VS PARTNERS
+
+# Data
+all_W_new = syn_df.groupby(['instance_post']).agg({'W_new': sum})['W_new'].tolist()
+all_type_pre = syn_df.groupby(['instance_post']).agg({'type_pre': 'count'})['type_pre'].tolist()
+categories = syn_df[category_column].unique()
+
+#Figure
+# Initialize the figure
+fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(20, 5))
+fig.suptitle(f'Comparison between {category_column}, {dataset_name}')
+
+# Define a color palette
+color_palette = sns.color_palette(color_cat_set, len(categories))
+
+for i, category in enumerate(categories):
+    # Filter the data for the current category
+    category_data = syn_df[syn_df[category_column] == category]
+    
+    # Compute grouped data for the current category
+    category_W_new = category_data.groupby(['instance_post']).agg({'W_new': sum})['W_new'].tolist()
+    category_type_pre = category_data.groupby(['instance_post']).agg({'type_pre': 'count'})['type_pre'].tolist()
+    
+    # Scatter plot for axs[0] and axs[2]
+    sns.scatterplot(x=category_type_pre, y=category_W_new, color=color_palette[i], ax=axs[i])
+
+    # Fit linear regression line and plot the diagonal reference line
+    x, y = np.array(category_type_pre), np.array(category_W_new)
+    slope, intercept = np.polyfit(x, y, 1)
+    axs[i].plot(x, slope * x + intercept, color='black', linestyle='--')
+    #axs[i].plot(x, x, color='gray', linestyle='--')
+
+    # Compute Pearson correlation coefficient and p-value
+    r_value, p_value = pearsonr(x, y)
+    
+    # Print R-squared and p-value
+    axs[i].text(0.1, 0.9, f'R-squared: {r_value**2:.2f}', transform=axs[i].transAxes, fontsize=10)
+    axs[i].text(0.1, 0.85, f'p-value: {p_value:.4f}', transform=axs[i].transAxes, fontsize=10)
+
+    #Titles subplot
+    axs[i].set_xlabel('Presynaptic partners', fontsize = 10)
+    axs[i].set_ylabel('Synaptic contacts', fontsize = 10)
+    axs[i].set_title(f'Scatter Plot and Correlation (Category: {category})', fontsize = 12)
+    #Removing plot spines
+    sns.despine(left=False, bottom=False)
+
+
+# Scatter plot and linear regression for axs[2]
+x_all, y_all = np.array(all_type_pre), np.array(all_W_new)
+sns.scatterplot(x=x_all, y=y_all, color=neuron_color, ax=axs[2])
+
+slope_all, intercept_all = np.polyfit(x_all, y_all, 1)
+axs[2].plot(x_all, slope_all * x_all + intercept_all, color='black', linestyle='--')
+#axs[2].plot(x_all, x_all, color='gray', linestyle='--')
+
+r_value_all, p_value_all = pearsonr(x_all, y_all)
+
+# Print R-squared and p-value for axs[2]
+axs[2].text(0.1, 0.9, f'R-squared: {r_value_all**2:.2f}', transform=axs[2].transAxes, fontsize=10)
+axs[2].text(0.1, 0.85, f'p-value: {p_value_all:.4f}', transform=axs[2].transAxes, fontsize=10)
+
+# Set labels and title for each subplot
+axs[2].set_xlabel('Presynaptic partners', fontsize = 10)
+axs[2].set_ylabel('Synaptic contacts', fontsize = 10)
+axs[2].set_title('Scatter Plot and Correlation (All data)', fontsize = 12)
+#Removing plot spines
+sns.despine(left=False, bottom=False)
+
+if save_figures:
+    # Quick plot saving
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Linear-correlations-in_{dataset_name}_{neuron_of_interest}_by_{category_column}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Linar correlations comparing categories')
+plt.close(fig)
+
+
+
 
 #%% 
 ############################################### HEATMAP - PLOTS ############################################
@@ -1963,51 +2049,48 @@ plt.close(fig)
 # Heatmap of presynaptic partners' person correlation
 # Relative numbers
 
-#TODO: fix the calculation of correlation (analysis part)
-if plot_correlation:
+correlation_rel_no_NaN_df.replace(np.NaN,1.0, inplace = True)
+_palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
+g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
 
-    correlation_rel_no_NaN_df.replace(np.NaN,1.0, inplace = True)
-    _palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
-    g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
-
-    g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, % of count(syn>={desired_count})') 
-    g.ax_heatmap.set_xlabel('Presynaptic neuron')
-    g.ax_heatmap.set_ylabel('Presynaptic neuron')
-    g.fig.subplots_adjust(top=0.9)
-    x0, y0, _w, _h = g.cbar_pos
-    g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
-    g.ax_cbar.set_title('pearson')
+g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, % of count(syn>={desired_count})') 
+g.ax_heatmap.set_xlabel('Presynaptic neuron')
+g.ax_heatmap.set_ylabel('Presynaptic neuron')
+g.fig.subplots_adjust(top=0.9)
+x0, y0, _w, _h = g.cbar_pos
+g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
+g.ax_cbar.set_title('pearson')
 
 
-    #Plot saving
-    if save_figures:
-        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-        figure_title = f'\Hierarchical-clustering-correlation-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
-        g.savefig(save_path+figure_title)
-        print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
-    plt.close(g.fig)
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Hierarchical-clustering-correlation-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    g.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
+plt.close(g.fig)
 
 
-    correlation_abs_no_NaN_df.replace(np.NaN,1.0, inplace = True)
-    _palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
-    g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
+correlation_abs_no_NaN_df.replace(np.NaN,1.0, inplace = True)
+_palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
+g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
 
-    g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, absolute count(syn>={desired_count})') 
-    g.ax_heatmap.set_xlabel('Presynaptic neuron')
-    g.ax_heatmap.set_ylabel('Presynaptic neuron')
-    g.fig.subplots_adjust(top=0.9)
-    x0, y0, _w, _h = g.cbar_pos
-    g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
-    g.ax_cbar.set_title('pearson')
+g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, absolute count(syn>={desired_count})') 
+g.ax_heatmap.set_xlabel('Presynaptic neuron')
+g.ax_heatmap.set_ylabel('Presynaptic neuron')
+g.fig.subplots_adjust(top=0.9)
+x0, y0, _w, _h = g.cbar_pos
+g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
+g.ax_cbar.set_title('pearson')
 
 
-    #Plot saving
-    if save_figures:
-        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-        figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
-        g.savefig(save_path+figure_title)
-        print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
-    plt.close(g.fig)
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    g.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
+plt.close(g.fig)
 
 
 ############################################# BOXPLOTS - PLOTS ##############################################
@@ -2211,7 +2294,7 @@ axs.set_ylabel('Explained-variability (percentage)')
 #Plot saving
 if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\PCA-exlpained-variability-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\PCA-explained-variability-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: PCA explained variability plotted and saved')
 plt.close(fig)
@@ -2331,7 +2414,7 @@ subthreshold = 0.05
 abs_eigvecs_abs = np.absolute(abs_eigvecs)
 norm_eigvecs_abs = abs_eigvecs_abs / abs_eigvecs_abs.sum(axis=0)
 fig, axs = plt.subplots(nrows=1, ncols=1)
-im = axs.imshow(norm_eigvecs_abs, cmap='coolwarm', aspect='auto')
+im = axs.imshow(norm_eigvecs_abs, cmap='Greens', aspect='auto')
 
 # Get the shape of the eigenvectors array
 num_neurons, num_pcs = norm_eigvecs_abs.shape
@@ -2373,6 +2456,8 @@ plt.close(fig)
 ############################################### NEUROPIL - PLOTS ############################################
 #############################################################################################################
 
+# Tm9: '#458A7C', Tm1:'#D57DA3'
+
 ################################################ BINARY COUNTs ###############################################
 #Plotting a single neuron
 
@@ -2387,30 +2472,29 @@ xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
 #Getting list for dot sizes and colors based on instance counts of a pre_partner
-pre_partner = 'Dm12'
+pre_partner = 'L3'
 
 #Dot sizes
 dot_sizes = _data[pre_partner].fillna(0).tolist()
-dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
-dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
+dot_sizes_ME = [size*10 for size in dot_sizes]  # Increase size by a factor of 20
+dot_sizes_LO = [size*5 for size in dot_sizes]  # Increase size by a factor of 10
 
 #Seb commented out since we plot all neurons in the next step anyways
 OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
-ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=dots_color)  # Adjust the size (s) as desired
-navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=neuron_color)  # Adjust the size (s) as desired
+navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
 ax.azim = mesh_azim 
 ax.elev = mesh_elev 
-#plt.show()
 
-# #Plot saving
-# if save_figures:
-#     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-#     figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
-#     fig.savefig(save_path+figure_title)
-#     print('FIGURE: Visualization of XYZ positions plotted and saved')
-# plt.close(fig)
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of XYZ positions plotted and saved')
+plt.close(fig)
 
 
 
@@ -2473,7 +2557,7 @@ for i, (pre_partner, ax) in enumerate(zip(pre_partner_list, axes.flatten())):
         xyz_pre_arr_new[:, 1],
         xyz_pre_arr_new[:, 2],
         s=dot_sizes_ME,
-        c=dots_color,
+        c=neuron_color,
         alpha=0.9
     )
     ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=2,c='k',alpha=1) # All dots
@@ -2687,7 +2771,7 @@ def non_match_elements(list_a, list_b):
 #     ax = fig.add_subplot(111, projection='3d')
 
 #     # Plot the object
-#     ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME, c=dots_color, alpha=0.9)
+#     ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME, c=neuron_color, alpha=0.9)
 #     navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
 
 #     #Rotating the view
