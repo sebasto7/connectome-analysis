@@ -20,6 +20,7 @@ from scipy.stats import pearsonr
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.cluster import hierarchy
 import matplotlib.gridspec as gridspec
+from matplotlib.backends.backend_pdf import PdfPages
 import os
 import math 
 from caveclient import CAVEclient
@@ -50,12 +51,13 @@ cm = 1/2.54  # centimeters in inches
 sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%'
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
-category_column = 'hemisphere'# 'dorso-ventral', 'hemisphere'
+category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
 color_cat_set = "Set1" # select a set for a seaborn color palette
 
 #YES NO options
 save_figures = True
 exclude_outliers = True # Plot variability without outliers
+instance_count_plot = False
 
 #%% 
 ############################################# USER INFORMATION ################################################
@@ -83,10 +85,18 @@ selection_area = ''
 
 #Analysis of heterogeneous partners only:
 discard_homogeneous = True # To analyse all partnes, make it False
-thr_homogenous = 0.75 # Threshold about which a partner is defined as homogenous (e.g presnet in 75% of the columns)
+thr_homogenous = 0.9 # Threshold about which a partner is defined as homogenous (e.g presnet in 90% or 75% of the columns)
+
+#Clustering options
+cluster_with_dendrogram = True
+
+#For permutation test in pearson correlation
+permutation_analysis = False
+num_permutations = 1000
+_seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'R'
+optic_lobe = 'L'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
 mesh_ME = 'ME_L' #
 mesh_LO = 'LO_L' #
@@ -96,6 +106,10 @@ neuron_of_interest = 'Tm9'
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
 neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
+
+# Cluster information
+analyzing_cluster = False
+cluster_id = 'C4'
 
 
 #Path and file
@@ -112,7 +126,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_healthy_L3_{optic_lobe}.txt' # 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_healthy_L3_{optic_lobe}.txt' # 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 # Healthy columns based on lamina detachement and damage L3s
 keep_only_healthy_columns = False # Only good if your data subselection does not considere it already.
@@ -125,6 +139,36 @@ ExM_dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\expansion-microsco
 #Processed data saving path
 saving_processed_data = False
 output_dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'#r'C:\Connectomics-Data\FlyWire\Processed-data'
+
+
+
+#When running data just for a cluster, making sure this option are like this:
+if analyzing_cluster:
+    print(f'Analyzin cluter: {cluster_id}')
+    subselection_file = True
+    fileName_txt = f'Tm9_cosine_similarity_{cluster_id}_{optic_lobe}.txt'
+    cluster_with_dendrogram = False
+    discard_homogeneous = False
+    permutation_analysis = True
+    if optic_lobe == 'R':
+        user_defined_sorted_column_order = ['L3','CT1','Mi4','Tm16','L4','Dm12','C3',
+                                            'Tm20','Tm1','putative-fru-N.I.','C2','TmY17',
+                                            'PS125','ML1','OA-AL2b2','TmY15','Me-Lo-2-N.I.','Tm2','Mi13']
+
+    elif optic_lobe == 'L':
+        user_defined_sorted_column_order = ['L3','CT1','Mi4','Tm16','putative-fru-N.I.',
+                                            'L4','PS125','Dm12','Tm20','C3','Tm1','ML1',
+                                            'Tm5c','Mi13','Tm2','OA-AL2b2','C2','TmY17'] 
+
+    #For Tm9::R, ['L3','CT1','Mi4','Tm16','L4','Dm12','C3','Tm20','Tm1','putative-fru-N.I.','C2','TmY17','PS125','ML1','OA-AL2b2','TmY15','Me-Lo-2-N.I.','Tm2','Mi13']
+    #For Tm9::L, ['L3','CT1','Mi4','Tm16','putative-fru-N.I.','L4','PS125','Dm12','Tm20','C3','Tm1','ML1','Tm5c','Mi13','Tm2','OA-AL2b2','C2','TmY17']
+
+    #Loading the complete (unclustered) data set
+    file_name = f'{neuron_of_interest}_{dataset_name}.xlsx'
+    processed_dataPath = os.path.join(output_dataPath,file_name)
+    dataset_abs_df = pd.read_excel(processed_dataPath, sheet_name='Absolut_counts', index_col = 0)
+    dataset_abs_df = dataset_abs_df[user_defined_sorted_column_order].copy()
+    
 
 #%% 
 ################################################## PRE-ANALYSIS ###############################################
@@ -432,9 +476,10 @@ presence_threshold_neuron_filter = thr_rel_presence_absence_df['Presynaptic neur
 #An homogeneous partner is beind define as that one present in at least X% of the columns (e.g. 75%)
 if discard_homogeneous == True:
     presence_threshold_neuron_filter = thr_rel_presence_absence_df[ thr_rel_presence_absence_df['Present']< thr_homogenous]['Presynaptic neuron'].tolist()
+    excluded_partners = thr_rel_presence_absence_df[ thr_rel_presence_absence_df['Present']> thr_homogenous]['Presynaptic neuron'].tolist()
     print(f'\nPartners being INcluded in the analyis:\n {presence_threshold_neuron_filter}')
-    print(f"\nPartners being EXcluded from the analyis:\n {thr_rel_presence_absence_df[ thr_rel_presence_absence_df['Present']> thr_homogenous]['Presynaptic neuron'].tolist()}")
-    
+    print(f"\nPartners being EXcluded from the analyis:\n {excluded_partners}")
+
 
 ########################################## PRESENCE - ABSENCE of a partner ####################################
 ###############################################################################################################
@@ -651,7 +696,12 @@ syn_popularity_abs_no_outliers_df = replace_outliers_with_nan(syn_popularity_abs
 
 presence_threshold_sorted_column_order = [neuron for neuron in sorted_column_order if neuron in presence_threshold_neuron_filter]
 
-print(f'\nPresynaptic partners have been sorted as in this list:\n {presence_threshold_sorted_column_order}')
+if analyzing_cluster:
+    # Create a new list containing the common elements in the same order as "user_defined_sorted_column_order"
+    common_list = [item for item in user_defined_sorted_column_order if item in presence_threshold_sorted_column_order]
+    presence_threshold_sorted_column_order = common_list
+
+print(f'\nPresynaptic partners sorted and included:\n {presence_threshold_sorted_column_order}')
 
 ##########################################  ABSOLUTE SYNAPTIC COUNTS ##########################################
 ####################################   ELECTRON AND EXPANSION MIRCORSOPY   ################################### 
@@ -712,7 +762,7 @@ correlation_rel_df = curr_df.corr(method='pearson', min_periods=1)
 p_values_correlation_rel_df = calculate_pvalues(correlation_rel_df) 
 p_values_correlation_rel_df_asterix_df = p_values_correlation_rel_df.applymap(lambda x: ''.join(['*' for t in [0.001,0.01,0.05] if x<=t]))
 
-###Same but replacing NaNs with zeros (The logic thing to do. NaN means actually no connection, so zero is find)
+###Same but replacing NaNs with zeros (The logic thing to do. NaN means actually no connection, so zero is fine)
 curr_df = curr_df.fillna(0).copy()
 correlation_rel_no_NaN_df = curr_df.corr(method='pearson', min_periods=1)
 #Calculating p_values
@@ -767,6 +817,75 @@ correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 sorted_correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 
 
+############################################   PERMUTATION TEST   ###########################################
+############################################  PEARSON CORRELATIONS ##########################################
+
+# Permutation functions
+from itertools import combinations
+
+# Function to compute the observed correlation and perform permutations for a specific pair of columns
+def permutation_test(cluster_df, dataset_df, column1_name, column2_name, num_permutations, seed= None):
+    if seed is not None:
+        np.random.seed(seed)  # Set the seed for reproducibility
+    #print(f'Using seed: {seed} for random selection of optic lobe columns from the full data set')    
+
+    # Randomly select the same number of rows from dataset_df as in cluster_df
+    dataset_df_sampled = dataset_df.sample(n=len(cluster_df), replace=False)
+
+    observed_corr = cluster_df[column1_name].corr(cluster_df[column2_name])  # Compute the observed correlation
+    shuffled_corrs = []
+
+    for _ in range(num_permutations):
+        shuffled_values = dataset_df_sampled[column2_name].sample(frac=1).values  # Shuffle the values of the second column
+        shuffled_df = pd.DataFrame({column1_name: cluster_df[column1_name].values,
+                                    f"Shuffled_{column2_name}": shuffled_values})
+        shuffled_corr = shuffled_df[column1_name].corr(shuffled_df[f"Shuffled_{column2_name}"])
+        shuffled_corrs.append(shuffled_corr)
+
+    # Calculate the p-value based on the number of shuffled correlations larger or equal to the observed correlation
+    p_value = (np.sum(np.abs(shuffled_corrs) >= np.abs(observed_corr)) + 1) / (num_permutations + 1)
+
+    return observed_corr, p_value, shuffled_corrs
+
+
+if permutation_analysis:
+    # Data
+    ### Absolute counts
+    curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+    curr_df = curr_df.fillna(0).copy()
+    if analyzing_cluster:
+        curr_dataset_abs_df = dataset_abs_df.fillna(0).copy()
+    else:
+        curr_dataset_abs_df = curr_df.copy() 
+
+    # Columns to be compared
+    column_names = curr_df.columns.tolist()
+
+    # In case you want to run it for different subsets of the data, code need to be modify for defining column_names
+    clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+
+    # Initialize empty DataFrames to store observed correlations and p-values
+    observed_corr_df = pd.DataFrame(columns=column_names, index=column_names)
+    p_value_df = pd.DataFrame(columns=column_names, index=column_names)
+
+    # Perform permutation test for each cluster and each pair of columns
+    for i, cluster_df in enumerate(clusters_list):
+        #print(f"Cluster {i + 1}:")
+        print(f"Doing permutation test for all pairs...")
+        for column_pair in combinations(column_names, 2):
+            column1_name, column2_name = column_pair
+            #print(f"Pair: {column1_name} and {column2_name}")
+            observed_corr, p_value, shuffled_corrs = permutation_test(cluster_df, curr_dataset_abs_df, column1_name, column2_name, num_permutations, _seed)
+            
+            # Save observed correlation and p-value in the corresponding DataFrames
+            observed_corr_df.loc[column1_name, column2_name] = observed_corr
+            p_value_df.loc[column1_name, column2_name] = p_value
+
+    observed_corr_df = observed_corr_df.apply(pd.to_numeric, errors='coerce')
+    p_value_df = p_value_df.apply(pd.to_numeric, errors='coerce')
+
+
+
 ############################################   COSINE SIMILARITY    ###########################################
 ############################################ HIERARCHICAL CLUSTERING ##########################################
 ###############################################################################################################
@@ -790,6 +909,8 @@ _data.fillna(0, inplace=True)
 
 # Calculate cosine similarity
 cosine_sim = cosine_similarity(_data.values)
+# Convert the cosine_sim 2D array to a DataFrame
+cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
 
 #Create a dataframe for later usage
 #Data we need
@@ -798,29 +919,76 @@ syn_df_grouped.reset_index(level='dorso-ventral', inplace= True)
 syn_df_grouped.reset_index(level='hemisphere', inplace= True)
 d_v_list = syn_df_grouped['dorso-ventral'].tolist()
 hemisphere_list = syn_df_grouped['hemisphere'].tolist()
+
 #Initializing the data frame
-cosine_sim_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere'], 
+cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere'], 
                   index = _data.index.tolist())
 #Filling in the data frame
 cosine_sim_nan = np.where(cosine_sim== 1., np.nan, cosine_sim)
 cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan,1),2)
-cosine_sim_df['cosine_sim'] = cosine_sim_list
-cosine_sim_df['hemisphere'] = hemisphere_list
-cosine_sim_df['dorso-ventral'] = d_v_list
+cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
+cosine_sim_summary_df['hemisphere'] = hemisphere_list
+cosine_sim_summary_df['dorso-ventral'] = d_v_list
 
 # Perform hierarchical clustering
 dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
 cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
+# Create a new DataFrame with reordered rows and columns
+_data_reordered_cosine_sim = _data.iloc[cosine_row_order].copy()
+# Calculate cosine similarity
+cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim .values)
+# Convert the cosine_sim 2D array to a DataFrame
+cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered, index=_data_reordered_cosine_sim.index, columns=_data_reordered_cosine_sim.index)
+
+
+################################################ DENDROGRAM CLUSTERING #########################################
 
 #TODO: define clusters based on branches of the dendogram using one of the options:
 # - Elbow Method
 # - Gap Statistic
 # - Silhouette Analysis
 
-# Create a new DataFrame with reordered rows and columns
-_data_reordered = _data.iloc[cosine_row_order].copy()
-# Calculate cosine similarity
-cosine_sim_reordered = cosine_similarity(_data_reordered.values)
+if cluster_with_dendrogram:
+
+    ## Using Silhouette Analysis
+    from sklearn.metrics import silhouette_score
+    from sklearn.cluster import AgglomerativeClustering
+
+    # Range of clusters to consider
+    range_n_clusters = range(4, 10)
+    # List to store silhouette scores
+    silhouette_scores = []
+    # Calculate silhouette scores for different numbers of clusters
+    for n_clusters in range_n_clusters:
+        clusterer = AgglomerativeClustering(n_clusters=n_clusters, linkage='ward')
+        cluster_labels = clusterer.fit_predict(cosine_sim)
+        silhouette_avg = silhouette_score(cosine_sim, cluster_labels)
+        silhouette_scores.append(silhouette_avg)
+
+    # Find the optimal number of clusters with the highest silhouette score
+    optimal_n_clusters = range_n_clusters[np.argmax(silhouette_scores)]
+    # Perform hierarchical clustering with the optimal number of clusters
+    clusterer = AgglomerativeClustering(n_clusters=optimal_n_clusters, linkage='ward')
+    cluster_labels = clusterer.fit_predict(cosine_sim)
+    # Add the "cluster" column to the "cosine_sim_summary_df" dataframe
+    cosine_sim_summary_df['cluster'] = cluster_labels
+    # Print the optimal number of clusters
+    print(f"\nOptimal number of clusters from cosine similarity based on dendrogram: {optimal_n_clusters}")
+
+    ## Separating cosine_sim values in clusters
+    unique_clusters = np.unique(cluster_labels)
+    # Create a dictionary to store the arrays for each cluster
+    cosine_cluster_arrays = {}
+    # Iterate over each unique cluster label
+    for cluster_label in unique_clusters:
+        # Find the indices of rows and columns belonging to the current cluster
+        cluster_indices = np.where(cluster_labels == cluster_label)[0]
+        # Get the values of the current cluster from the cosine_sim array
+        cluster_array = cosine_sim[cluster_indices][:, cluster_indices]
+        # Store the cluster array in the dictionary with the cluster label as the key
+        cosine_cluster_arrays[cluster_label] = cluster_array
+    # Now "cosine_cluster_arrays" contains all the 2D arrays corresponding to each cluster
+    # You can access them using the cluster label as the key, e.g., cosine_cluster_arrays[0] for the first cluster
 
 
 
@@ -900,6 +1068,10 @@ n = abs_data_array_norm.shape[0]
 ## Cov matrix and eigenvectors
 abs_cov = (1/n) * abs_data_array_norm @ abs_data_array_norm.T
 abs_eigvals, abs_eigvecs = np.linalg.eig(abs_cov)
+
+#Taking the real part of the eigenvectors if it is a complex number
+abs_eigvecs = np.real(abs_eigvecs)
+
 k = np.argsort(abs_eigvals)[::-1]
 abs_eigvals = abs_eigvals[k]
 abs_eigvecs = abs_eigvecs[:,k]
@@ -925,6 +1097,50 @@ print(f'Final #of contacts: {final_synaptic_counts}(mean+-std)(n={len(id_column)
 print(f'Final #of presynaptic cells: {final_partners_number}(mean+-std)(n={len(id_column)})') # final number of presynaptic cells (mean+-std) after filtering
 print(f'Final #of presynaptic cell types {final_cell_types_number}(mean+-std)(n={len(id_column)})') # final number of presynaptic cell types (mean+-std) after filtering
 print('\n')
+
+#TODO Print absolute contacts (mean + std) for the excluded_partners combined
+if discard_homogeneous:
+    ## For relative counts
+    # Calculate the sum, mean, std, and SEM for each row
+    excluded_partners_df = top_rank_popularity_rel_df[excluded_partners].copy()
+    excluded_partners_df['sum'] = excluded_partners_df.sum(axis=1)
+    excluded_partners_df['mean'] = excluded_partners_df.mean(axis=1)
+    excluded_partners_df['std'] = excluded_partners_df.std(axis=1)
+    excluded_partners_df['median'] = excluded_partners_df.median(axis=1)
+    # Calculate the SEM
+    num_data_points =excluded_partners_df.shape[1]  # Number of columns in the DataFrame
+    excluded_partners_df['sem'] = excluded_partners_df['std'] / np.sqrt(num_data_points)
+    # Calculate the mean and standard deviation for each column
+    column_means = excluded_partners_df.mean(axis=0)
+    column_medians = excluded_partners_df.median(axis=0)
+    column_stds = excluded_partners_df.std(axis=0)
+    column_sems = column_stds / np.sqrt(excluded_partners_df.shape[0])
+    print(f'Excluded partners: {excluded_partners} ') 
+    print(f"Relative synaptic number being excluded: {round(column_means['sum'],2)}+-{round(column_stds['sum'], 2)} or {round(column_sems['sum'], 2)} (mean+-std or sem)")
+
+    ## For absolute counts
+    # Calculate the sum, mean, std, and SEM for each row
+    excluded_partners_df = top_rank_popularity_abs_df[excluded_partners].copy()
+    excluded_partners_df['sum'] = excluded_partners_df.sum(axis=1)
+    excluded_partners_df['mean'] = excluded_partners_df.mean(axis=1)
+    excluded_partners_df['std'] = excluded_partners_df.std(axis=1)
+    excluded_partners_df['median'] = excluded_partners_df.median(axis=1)
+    # Calculate the SEM
+    num_data_points =excluded_partners_df.shape[1]  # Number of columns in the DataFrame
+    excluded_partners_df['sem'] = excluded_partners_df['std'] / np.sqrt(num_data_points)
+
+    # Calculate the mean and standard deviation for each column
+    column_means = excluded_partners_df.mean(axis=0)
+    column_medians = excluded_partners_df.median(axis=0)
+    column_stds = excluded_partners_df.std(axis=0)
+    column_sems = column_stds / np.sqrt(excluded_partners_df.shape[0])
+    # # Add the means and stds as new rows to the DataFrame
+    # excluded_partners_df = excluded_partners_df.append(column_means, ignore_index=True)
+    # excluded_partners_df = excluded_partners_df.append(column_stds, ignore_index=True)
+    # # Assign row labels for clarity
+    # excluded_partners_df.index = excluded_partners_df.index.to_list()[:-2] + ['mean', 'std']
+    print(f"Absolute synaptic number being excluded: {round(column_means['sum'],2)}+-{round(column_stds['sum'], 2)} or {round(column_sems['sum'], 2)} (mean+-std or sem)")  
+
 
 #%%
 ############################################ SAVING SECTION #############################################
@@ -1285,7 +1501,7 @@ axs[1, 0].set_xticklabels(categories)
 # Iterate over unique categories
 for i, category in enumerate(categories):
     # Filter the data for the current category
-    category_grouped = cosine_sim_df[cosine_sim_df[category_column] == category]
+    category_grouped = cosine_sim_summary_df[cosine_sim_summary_df[category_column] == category]
     
     # Plot the boxplot for the current category
     box = axs[1, 1].boxplot(category_grouped['cosine_sim'], positions=[positions[i]], widths=0.4, showmeans=True, patch_artist = True)
@@ -1402,14 +1618,81 @@ sns.despine(left=False, bottom=False)
 if save_figures:
     # Quick plot saving
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Linear-correlations-in_{dataset_name}_{neuron_of_interest}_by_{category_column}.pdf'
+    figure_title = f'\Linear-correlations-in_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Linar correlations comparing categories')
 plt.close(fig)
 
 
+############################################ SCATTER PLOT - ALL PARTNERS ####################################
+#############################################    CORRELATIONS   ############################################
+from itertools import combinations
 
+#Data
+curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+curr_df = curr_df.fillna(0).copy()
 
+# Calculate the number of columns in the DataFrame
+num_cols = curr_df.shape[1]
+
+# Get all unique combinations of column pairs
+column_pairs = list(combinations(curr_df.columns, 2))
+
+# Determine the number of subplots needed
+num_subplots = sum(pearsonr(curr_df[x_col], curr_df[y_col])[1] < 0.05 for x_col, y_col in column_pairs)
+
+# Define the number of rows and columns for subplots
+num_cols_plot = int(np.ceil(np.sqrt(num_subplots)))
+num_rows = (num_subplots + num_cols_plot - 1) // num_cols_plot
+
+# Initialize the figure and gridspec only with necessary subplots
+fig, axs = plt.subplots(nrows=num_rows, ncols=num_cols_plot, figsize=(15, 3*num_rows), 
+                        gridspec_kw={'height_ratios': [1]*num_rows})
+fig.suptitle('Scatter Plots and Correlations')
+
+# Variable to keep track of the current subplot index
+subplot_index = 0
+
+# Iterate over all pairs of columns
+for i, (x_col, y_col) in enumerate(column_pairs):
+    # Calculate the Pearson correlation and p-value
+    r_value, p_value = pearsonr(curr_df[x_col], curr_df[y_col])
+
+    # Only plot if the p-value is less than 0.05
+    if p_value < 0.05:
+        # Get the data for the current pair of columns
+        x_data, y_data = curr_df[x_col], curr_df[y_col]
+
+        # Scatter plot for the current pair
+        ax = axs[subplot_index // num_cols_plot, subplot_index % num_cols_plot]
+        sns.scatterplot(x=x_data, y=y_data, ax=ax, color=neuron_color)
+        
+        # Fit linear regression line and get correlation values
+        slope, intercept = np.polyfit(x_data, y_data, 1)
+        r_squared = r_value ** 2
+
+        # Plot the fitted line
+        ax.plot(x_data, slope * x_data + intercept, color='black', linestyle='--')
+
+        # Add text for R-squared and p-value
+        ax.text(0.1, 0.85, f'R-squared: {r_squared:.2f}', transform=ax.transAxes, fontsize=10)
+        ax.text(0.1, 0.7, f'p-value: {p_value:.4f}', transform=ax.transAxes, fontsize=10)
+
+        # Set axis labels and title for the subplot
+        ax.set_xlabel(x_col)
+        ax.set_ylabel(y_col)
+        #ax.set_title(f'Scatter Plot: {x_col} vs {y_col}')
+
+        # Increment the subplot index
+        subplot_index += 1
+
+if save_figures:
+    # Quick plot saving
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Linear-correlations-between-partners_{dataset_name}_{neuron_of_interest}_by_{category_column}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Linar correlations comparing partners')
+plt.close(fig)
 #%% 
 ############################################### HEATMAP - PLOTS ############################################
 ############################################################################################################
@@ -1474,7 +1757,7 @@ curr_count_sorted_df = curr_df[column_order] # swapping order of columns
 
 #Sorting based on rank
 curr_rank_sorted_df = counting_instances_df.T[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
-curr_rank_sorted_df[presence_threshold_neuron_filter]
+#curr_rank_sorted_df[presence_threshold_neuron_filter]
 
 
 # Data
@@ -1663,8 +1946,8 @@ plt.close(fig)
 
 
 ################################################### ABSOLUTE COUNTS  #################################################
-# Visualization of presynaptic contact percentatge for all columns
-#Heatmap of presynaptic partners  colorcoded by relative synaptic count
+# Visualization of presynaptic contacts for all columns
+#Heatmap of presynaptic partners  colorcoded by absolute synaptic count
 
 
 #Data
@@ -1898,15 +2181,15 @@ plt.close(fig)
 # Visualization cosine similatiry of column vectors (postsynaptic nueron´s input space)
 
 #Data
-_data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()
-_data.dropna(how='all', inplace = True)    #now dropping if all values in the row are nan
+_data = _data_reordered_cosine_sim
+_data.dropna(how='all', inplace=True)    # now dropping if all values in the row are nan
 
 # Create a figure with custom grid layout
 fig = plt.figure(figsize=(8, 8))
-gs = gridspec.GridSpec(2, 2, width_ratios=[8, 1], height_ratios=[1, 8])
+gs = gridspec.GridSpec(3, 2, width_ratios=[8, 1], height_ratios=[1.2, 8, 0.5])
 
 # Plot the dendrogram_cosine
-ax_dendrogram_cosine = plt.subplot(gs[0])
+ax_dendrogram_cosine = plt.subplot(gs[0, :-1])
 ax_dendrogram_cosine.spines['top'].set_visible(False)
 ax_dendrogram_cosine.spines['right'].set_visible(False)
 ax_dendrogram_cosine.spines['bottom'].set_visible(False)
@@ -1915,17 +2198,23 @@ ax_dendrogram_cosine.get_xaxis().set_visible(False)
 ax_dendrogram_cosine.get_yaxis().set_visible(False)
 hierarchy.dendrogram(dendrogram_cosine, ax=ax_dendrogram_cosine, color_threshold=0)
 
-
 # Plot the heatmap using the reordered DataFrame
-ax_heatmap = plt.subplot(gs[2])
+ax_heatmap = plt.subplot(gs[1, :-1])
 sns.heatmap(cosine_sim_reordered, cmap='coolwarm', annot=False, xticklabels=_data.index, yticklabels=_data.index, ax=ax_heatmap, cbar=False)
-ax_heatmap.set_title('Cosine Similarity Heatmap')
+#ax_heatmap.set_title('Cosine Similarity Heatmap')
 ax_heatmap.set_xlabel('Column')
 ax_heatmap.set_ylabel('Column')
 ax_heatmap.set_xticklabels(ax_heatmap.get_xticklabels(), rotation=90, fontsize=3)
 ax_heatmap.set_yticklabels(ax_heatmap.get_yticklabels(), rotation=0, fontsize=3)
 
-plt.tight_layout()
+# Create a dummy plot for the color bar
+dummy_cax = fig.add_subplot(gs[2, :-1])
+dummy_cax.set_xticks([])
+dummy_cax.set_yticks([])
+
+# Add color bar below the heatmap
+cbar = plt.colorbar(ax_heatmap.collections[0], cax=dummy_cax, orientation='horizontal')
+cbar.set_label('Cosine Similarity')
 
 #Plot saving
 if save_figures:
@@ -2044,7 +2333,7 @@ plt.close(fig)
 
 
 
-############################################ CORRELATION MATRIXES  ##########################################
+############################################ CORRELATION MATRIXES  #############################################
 # Visualization of Hieracrchical clustering
 # Heatmap of presynaptic partners' person correlation
 # Relative numbers
@@ -2092,11 +2381,92 @@ if save_figures:
     print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
 plt.close(g.fig)
 
+################################ PERMUTATION PLOTS FOR THE CORRELATION MATRIX ###############################
+
+if permutation_analysis:
+    #Plotting p-values <0.05 from the permutation
+    fig, axs = plt.subplots(nrows =1, ncols = 2, figsize = (40*cm, 15*cm))
+
+    def filter_values(val):
+        return f"{val:.3f}" if val < 0.05 else ""
+
+    # Create the heatmap and annotate cells with p-values < 0.05
+    sns.heatmap(p_value_df, annot=p_value_df.applymap(filter_values), cmap='coolwarm', center=0.05, fmt='', ax = axs[0])
+    axs[0].set_title('Permutation test - p-values')
+
+    sns.heatmap(observed_corr_df, cmap='coolwarm', ax = axs[1])
+    axs[1].set_title('Observed correlation')
+
+    if save_figures:
+        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Permutation-test-pvalues_{dataset_name}_{neuron_of_interest}.pdf'
+        fig.savefig(save_path+figure_title)
+        print('FIGURE: Visualization of permutation test values of pearson correlations')
+    plt.close(fig)
+
+######################################### DISTRIBUTIONS FROM PERMUTATIONS ########################################
+### Plotting all distributions  of correlations values during the permutation per each pair
+
+if permutation_analysis:
+    # Data
+    ### Absolute counts
+    curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy()
+    curr_df = curr_df.fillna(0).copy()
+    if analyzing_cluster:
+        curr_dataset_abs_df = dataset_abs_df.fillna(0).copy()
+    else:
+        curr_dataset_abs_df = curr_df.copy() 
+
+    # Columns to be compared
+    column_names = curr_df.columns.tolist()
+
+    # In case you want to run it for different subsets of the data, code needs to be modified for defining column_names
+    clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+
+    # Create subplots to visualize the results
+    valid_pairs = list(combinations(column_names, 2))
+
+    # Define the number of subplots per figure
+    subplots_per_figure = 16
+    num_figures = int(np.ceil(len(valid_pairs) / subplots_per_figure))
+
+    # Create and save figures with subplots
+    figure_title = f'\Correlation_permutation_plots_{dataset_name}_{neuron_of_interest}.pdf'
+    outputPath =  save_path + figure_title
+    with PdfPages(outputPath) as pdf:
+        for fig_num in range(num_figures):
+            start_idx = fig_num * subplots_per_figure
+            end_idx = min((fig_num + 1) * subplots_per_figure, len(valid_pairs))
+
+            num_rows = num_cols = int(np.ceil(np.sqrt(end_idx - start_idx)))
+            fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
+
+            for pair_idx, (column1_name, column2_name) in enumerate(valid_pairs[start_idx:end_idx]):
+                observed_corr, p_value, shuffled_corrs = permutation_test(curr_df, curr_dataset_abs_df, column1_name, column2_name, num_permutations, _seed)
+
+                # Plot the observed correlation and the distribution of shuffled correlations in the corresponding subplot
+                ax = axes[pair_idx // num_cols, pair_idx % num_cols]
+                ax.hist(shuffled_corrs, bins=30, alpha=0.6, color='gray', edgecolor='black', label='Shuffled')
+                ax.axvline(observed_corr, color='red', linestyle='dashed', linewidth=2, label='Observed')
+                ax.set_title(f"{column1_name} vs. {column2_name}")
+                ax.legend()
+
+                # Annotate the p-value in the plot
+                ax.text(0.8, 0.85, f"P-value: {p_value:.3f}", transform=ax.transAxes, fontsize=10, fontweight='bold')
+
+            # Hide empty subplots if any
+            for pair_idx in range(end_idx - start_idx, num_rows * num_cols):
+                axes[pair_idx // num_cols, pair_idx % num_cols].axis('off')
+
+            if save_figures:
+                pdf.savefig(fig)
+            plt.close(fig)
+
 
 ############################################# BOXPLOTS - PLOTS ##############################################
 #############################################################################################################
 
-# Plotting box plots of presynaptic counts
+############################################# PRESYNAPTIC COUNTS ############################################
 # Relative and absolute counts across columns
 
 # Data
@@ -2138,6 +2508,78 @@ if save_figures:
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of presynaptic partners contacts')
 plt.close(fig)
+
+
+###################################### COSINE SIMILARITY - CLUSTERS #########################################
+# Cosine values within a cluster and relative to other clusters
+
+if cluster_with_dendrogram:
+    ### Within a cluster
+    # Data preprocessing 
+    df_cluster = pd.DataFrame({cluster_name: pd.Series(cluster_values.flatten()) for cluster_name, cluster_values in cosine_cluster_arrays.items()})
+    df_cluster = df_cluster.round(2).copy()
+    df_cluster[df_cluster == 1.00] = np.nan
+
+    fig, axs = plt.subplots(nrows=2, ncols=1, figsize=(10*cm, 20*cm))
+
+    # Create a color palette for boxplot colors
+    color_palette = sns.color_palette("Set3", n_colors=len(cosine_cluster_arrays))
+
+    # First axis
+    # Create the boxplot
+    sns.boxplot(data=df_cluster, palette=color_palette, ax=axs[0])
+    # Set labels and title
+    axs[0].set_xlabel('Clusters')
+    axs[0].set_ylabel('Cosine similarity')
+    axs[0].set_title('Within cluster similarity')
+    axs[0].grid(False)
+    # Remove the left and upper border lines
+    axs[0].spines['right'].set_visible(False)
+    axs[0].spines['top'].set_visible(False)
+
+    # Second axis
+    # Create the boxplot using pandas
+    box = df_cluster.boxplot(patch_artist=True, ax=axs[1])
+
+    # Set labels and title
+    axs[1].set_xlabel('Clusters')
+    axs[1].set_ylabel('Cosine similarity')
+    axs[1].set_title('Number of columns in each cluster')
+
+    # Function to add N labels inside each boxplot
+    def add_n_labels(box, cluster_arrays):
+        for i, (cluster_name, cluster_values) in enumerate(cluster_arrays.items()):
+            # Get the number of data points (N) for each boxplot
+            num_data_points = len(cluster_values)
+
+            # Calculate the position to place the text inside the boxplot
+            x_pos = i + 1
+            y_pos = df_cluster[cluster_name].median()  # Y position inside the box is set to the median of the data
+
+            # Add the N label inside the boxplot
+            box.text(x_pos, y_pos, f'N = {num_data_points}', ha='center', va='center', fontsize=10, fontweight='bold')
+        
+        box.grid(False)
+        # Remove the left and upper border lines
+        box.spines['right'].set_visible(False)
+        box.spines['top'].set_visible(False)
+
+    # Call the function to add N labels
+    add_n_labels(axs[1], cosine_cluster_arrays)
+
+
+    #Plot saving
+    if save_figures:
+        save_path =  f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Box-plot-within-cluster-similarity_{dataset_name}_{neuron_of_interest}_cosine_sim.pdf'
+        fig.savefig(save_path+figure_title)
+        print('FIGURE: Visualization of cosine similarity within cluster')
+    plt.close(fig)
+
+
+
+    #TODO
+    ### Between clusters
 
 
 
@@ -2471,30 +2913,30 @@ xyz_pre = xyz_df[xyz_neuropil].tolist()
 xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
+
+
+# #Seb commented out since we plot all neurons in the next step anyways
 #Getting list for dot sizes and colors based on instance counts of a pre_partner
-pre_partner = 'L3'
-
+#pre_partner = 'Tm16'
 #Dot sizes
-dot_sizes = _data[pre_partner].fillna(0).tolist()
-dot_sizes_ME = [size*10 for size in dot_sizes]  # Increase size by a factor of 20
-dot_sizes_LO = [size*5 for size in dot_sizes]  # Increase size by a factor of 10
+# dot_sizes = _data[pre_partner].fillna(0).tolist()
+# dot_sizes_ME = [size*10 for size in dot_sizes]  # Increase size by a factor of 20
+# dot_sizes_LO = [size*5 for size in dot_sizes]  # Increase size by a factor of 10
+# OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=neuron_color)  # Adjust the size (s) as desired
+# navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+# ax.azim = mesh_azim 
+# ax.elev = mesh_elev 
 
-#Seb commented out since we plot all neurons in the next step anyways
-OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=neuron_color)  # Adjust the size (s) as desired
-navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
-ax.azim = mesh_azim 
-ax.elev = mesh_elev 
-
-#Plot saving
-if save_figures:
-    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of XYZ positions plotted and saved')
-plt.close(fig)
+# #Plot saving
+# if save_figures:
+#     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+#     figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+#     fig.savefig(save_path+figure_title)
+#     print('FIGURE: Visualization of XYZ positions plotted and saved')
+# plt.close(fig)
 
 
 
@@ -2645,74 +3087,76 @@ xyz_pre = xyz_df[xyz_neuropil].tolist()
 xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
-#Getting list for dot sizes and colors based on instance counts of a pre_partner
-pre_partner = 'Tm16'
 
-#Dot sizes
-dot_sizes = counting_instances_df.T[pre_partner].fillna(0).tolist()
-dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
-dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
+if instance_count_plot:
+    #Getting list for dot sizes and colors based on instance counts of a pre_partner
+    pre_partner = 'Tm16'
 
-size_color_map = {}
-color_palette = sns.color_palette(color_palette_name, len(set(dot_sizes)))
+    #Dot sizes
+    dot_sizes = counting_instances_df.T[pre_partner].fillna(0).tolist()
+    dot_sizes_ME = [size*20 for size in dot_sizes]  # Increase size by a factor of 20
+    dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
 
-#Dot colors
-dot_colors = []
+    size_color_map = {}
+    color_palette = sns.color_palette(color_palette_name, len(set(dot_sizes)))
 
-for size in dot_sizes:
-    if size != 0.0 and size not in size_color_map:
-        size_color_map[size] = color_palette[len(size_color_map)]
-    #dot_colors.append(size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0))
-    color = size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0)
-    color = (*color[:3], 1.0)  # Make color fully opaque
-    dot_colors.append(color)
+    #Dot colors
+    dot_colors = []
+
+    for size in dot_sizes:
+        if size != 0.0 and size not in size_color_map:
+            size_color_map[size] = color_palette[len(size_color_map)]
+        #dot_colors.append(size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0))
+        color = size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0)
+        color = (*color[:3], 1.0)  # Make color fully opaque
+        dot_colors.append(color)
 
 
 
 
-OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=dot_colors)  # Adjust the size (s) as desired
-ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=5,c='k') # All dots
-navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um') #
-ax.azim = mesh_azim 
-ax.elev = mesh_elev 
-#plt.show()
+    OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=dot_colors)  # Adjust the size (s) as desired
+    ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=5,c='k') # All dots
+    navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um') #
+    ax.azim = mesh_azim 
+    ax.elev = mesh_elev 
+    #plt.show()
 
-#Plot saving
-if save_figures:
-    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_instance_counts_ME_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of XYZ positions plotted and saved')
-plt.close(fig)
+    #Plot saving
+    if save_figures:
+        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Meshes_XYZ_positions_instance_counts_ME_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+        fig.savefig(save_path+figure_title)
+        print('FIGURE: Visualization of XYZ positions plotted and saved')
+    plt.close(fig)
 
-#Gettting the center point in specific neuropile from database
-xyz_neuropil = 'XYZ-LO'
-xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
-xyz_pre = xyz_df[xyz_neuropil].tolist()
-# Split each string by comma and convert the elements to floats
-xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
-xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
+    #Gettting the center point in specific neuropile from database
+    xyz_neuropil = 'XYZ-LO'
+    xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
+    xyz_pre = xyz_df[xyz_neuropil].tolist()
+    # Split each string by comma and convert the elements to floats
+    xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
+    xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
-OL_R = flywire.get_neuropil_volumes([mesh_LO]) #['ME_R','LO_R','LOP_R']
+    OL_R = flywire.get_neuropil_volumes([mesh_LO]) #['ME_R','LO_R','LOP_R']
 
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_LO,c=dot_colors)  # Adjust the size (s) as desired
-navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
-ax.azim = -6
-ax.elev = -57
-#plt.show()
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_LO,c=dot_colors)  # Adjust the size (s) as desired
+    navis.plot2d([xyz_pre_arr_new,OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
+    ax.azim = -6
+    ax.elev = -57
+    #plt.show()
 
-#Plot saving
-if save_figures:
-    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Meshes_XYZ_positions_instance_counts_LO_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
-    fig.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of XYZ positions plotted and saved')
-plt.close(fig)
+    #Plot saving
+    if save_figures:
+        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Meshes_XYZ_positions_instance_counts_LO_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+        fig.savefig(save_path+figure_title)
+        print('FIGURE: Visualization of XYZ positions plotted and saved')
+    plt.close(fig)
 
 
 
@@ -2889,3 +3333,66 @@ def non_match_elements(list_a, list_b):
 #     print('FIGURE: PCA plotted and saved')
 # plt.close(fig)
 
+# ######################################### DISTRIBUTIONS FROM PERMUTATIONS ########################################
+
+# # Valid code:
+# def permutation_test_old(cluster_df, column1_name, column2_name, num_permutations):
+#     observed_corr = cluster_df[column1_name].corr(cluster_df[column2_name])  # Compute the observed correlation
+#     shuffled_corrs = []
+
+#     for _ in range(num_permutations):
+#         shuffled_values = cluster_df[column2_name].sample(frac=1).values  # Shuffle the values of the second column
+#         shuffled_df = pd.DataFrame({column1_name: cluster_df[column1_name].values,
+#                                     f"Shuffled_{column2_name}": shuffled_values})
+#         shuffled_corr = shuffled_df[column1_name].corr(shuffled_df[f"Shuffled_{column2_name}"])
+#         shuffled_corrs.append(shuffled_corr)
+
+#     # Calculate the p-value based on the number of shuffled correlations larger or equal to the observed correlation
+#     p_value = (np.sum(np.abs(shuffled_corrs) >= np.abs(observed_corr)) + 1) / (num_permutations + 1)
+
+#     return observed_corr, p_value, shuffled_corrs
+
+# # Data
+# ### Absolute counts
+# curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+# curr_df = curr_df.fillna(0).copy()
+# # Columns to be compared
+# column_names = curr_df.columns.tolist()
+
+# # In case you want to run it for different subsets of the data, code need to be modify for defining column_names
+# clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+
+# # Create subplots to visualize the results
+# valid_pairs = list(combinations(column_names, 2))
+
+# # Define the number of subplots per figure
+# subplots_per_figure = 15
+# num_figures = int(np.ceil(len(valid_pairs) / subplots_per_figure))
+
+# # Create and display figures with subplots
+# for fig_num in range(num_figures):
+#     start_idx = fig_num * subplots_per_figure
+#     end_idx = min((fig_num + 1) * subplots_per_figure, len(valid_pairs))
+
+#     num_rows = num_cols = int(np.ceil(np.sqrt(end_idx - start_idx)))
+#     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
+
+#     for pair_idx, (column1_name, column2_name) in enumerate(valid_pairs[start_idx:end_idx]):
+#         observed_corr, p_value, shuffled_corrs = permutation_test(curr_df, column1_name, column2_name, num_permutations)
+
+#         # Plot the observed correlation and the distribution of shuffled correlations in the corresponding subplot
+#         ax = axes[pair_idx // num_cols, pair_idx % num_cols]
+#         ax.hist(shuffled_corrs, bins=30, alpha=0.6, color='gray', edgecolor='black', label='Shuffled')
+#         ax.axvline(observed_corr, color='red', linestyle='dashed', linewidth=2, label='Observed')
+#         ax.set_title(f"{column1_name} vs. {column2_name}")
+#         ax.legend()
+
+#         # Annotate the p-value in the plot
+#         ax.text(0.8, 0.85, f"P-value: {p_value:.3f}", transform=ax.transAxes, fontsize=10, fontweight='bold')
+
+#     # Hide empty subplots if any
+#     for pair_idx in range(end_idx - start_idx, num_rows * num_cols):
+#         axes[pair_idx // num_cols, pair_idx % num_cols].axis('off')
+
+#     plt.tight_layout()
+#     plt.show()
