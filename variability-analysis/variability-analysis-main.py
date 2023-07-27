@@ -52,9 +52,11 @@ sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_co
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
 category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
+#Colors
 color_cat_set = "Set1" # select a set for a seaborn color palette
-
-#YES NO options
+hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
+neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
+#YES-NO options
 save_figures = True
 exclude_outliers = True # Plot variability without outliers
 instance_count_plot = False
@@ -69,8 +71,8 @@ desired_coverage = 80 # in percent
 plus_minus = 5 # in percent
 
 #Synaptic counts
-desired_count = 3 # minimun number of synapses to consider in the analysis # Tm1:4, Tm9:3, Tm2:4, 
-num_type_copies_min = 2 #Number for neuron copies relevant for the low-synapses partners
+min_desired_count = 3 # minimun number of synapses to consider in the analysis # Tm1:4, Tm9:3, Tm2:4, 
+num_type_copies_min = 2 #Number for neuron copies relevant for the low-synapses partners (currently not in use)
 presence_threshold = 0.05 # If a partner is in less than 5% of the columns, it will be discarted for further visualizations
 
 #Neuron counts
@@ -84,8 +86,8 @@ d_v_filter = False
 selection_area = ''
 
 #Analysis of heterogeneous partners only:
-discard_homogeneous = True # To analyse all partnes, make it False
-thr_homogenous = 0.9 # Threshold about which a partner is defined as homogenous (e.g presnet in 90% or 75% of the columns)
+discard_homogeneous = False # To analyse all partnes, make it False
+thr_homogenous = 0.9 # Threshold about which a partner is defined as homogenous (e.g present in 90% or 75% of the columns)
 
 #Clustering options
 cluster_with_dendrogram = True
@@ -96,15 +98,13 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'L'
+optic_lobe = 'R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
 mesh_ME = 'ME_L' #
 mesh_LO = 'LO_L' #
 mesh_azim = 16# -18 for ME_R, 16 for ME_L
 mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
-hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
-neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 # Cluster information
@@ -118,6 +118,7 @@ dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets'#r'C:\
 fileDate = '20230718'
 fileName = f'{neuron_of_interest}_neurons_input_count_{optic_lobe}_{fileDate}.xlsx'
 fileName_database = f'{neuron_of_interest} proofreadings_{fileDate}.xlsx'
+fileName_NT = 'NT_identity_optic_lobe_neurons.xlsx'
 
 #Data set subselection
 subselection_filter = True
@@ -141,8 +142,10 @@ saving_processed_data = False
 output_dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'#r'C:\Connectomics-Data\FlyWire\Processed-data'
 
 
+#%%  
+############################################# ADVANCE CLUSTER OPTIONS #######################################
 
-#When running data just for a cluster, making sure this option are like this:
+# When running data just for a cluster, making sure this option are like this:
 if analyzing_cluster:
     print(f'Analyzin cluter: {cluster_id}')
     subselection_file = True
@@ -182,24 +185,30 @@ df = pd.read_excel(filePath)
 filePath = os.path.join(dataPath,fileName_database)
 database_df = pd.read_excel(filePath)
 
+#Loading neurotransmitter (NT) identity (excel file)
+filePath = os.path.join(dataPath,fileName_NT)
+NT_df = pd.read_excel(filePath)
+
 #Loading subselection file
 if subselection_file:
     filePath = os.path.join(txtPath,fileName_txt)
     txt_data = pd.read_csv(filePath, sep=" ", header=None)
     subselection_id_columns = list(set(txt_data[0].tolist()))
 
-#Dropping rows realted to manual proofreading and strings:
-if df["postsynaptic_ID"][0] == 'asdf': #Dropping the fisrt row ('asdf' was added as a walk-around to set that column values as type str)
+#Dropping rows realted to manual proofreading and strings
+#('asdf' was added as a walk-around to set that column values as type str)
+if df["postsynaptic_ID"][0] == 'asdf': 
     df = df.iloc[1: , :]
     df.reset_index(inplace=True,drop=True)
 
-if database_df["seg_id"][0] == 'asdf': #Dropping the fisrt row ('asdf' was added as a walk-around to set that column values as type str)
+if database_df["seg_id"][0] == 'asdf': 
     database_df = database_df.iloc[1: , :]
     database_df.reset_index(inplace=True,drop=True)
-
-if 'INPUTS PROOFREAD' in df.values: # Removing unnecessary rows ment for human use only
-    df = df[df['presynaptic_ID']!= 'INPUTS PROOFREAD'].copy() # Getting rid of info rows with no connectomics data
-
+    
+# Removing unnecessary rows ment for human use only.
+# Getting rid of info rows with no connectomics data
+if 'INPUTS PROOFREAD' in df.values: 
+    df = df[df['presynaptic_ID']!= 'INPUTS PROOFREAD'].copy() 
 
 #Adjusting column names to meet the naming of the FIB25 data sets in NeuPrint (interesting for future use or comparison)
 #Creating new columns
@@ -236,18 +245,18 @@ df_0 = df.copy()
 df['column_percent'] = round((df['W_new'] / df.groupby('instance_post')['W_new'].transform('sum'))*100,2)
 df['cumulative_column_percent'] = df.groupby('instance_post')['column_percent'].cumsum()
  
-#TODO: replase this approach of df[df['W_new']== desired_count] to look for total coverage.
+#TODO: replase this approach of df[df['W_new']== min_desired_count] to look for total coverage.
 #Initial coverage (mean-+std  % of all inputs across columns) before synaptic-count filter
 desired_count_df = df[df['W_new']== 1].copy() # 1 as the lowest number for a contact
 last_percent_with_desired_count = pd.DataFrame(desired_count_df.groupby(['instance_post'])['cumulative_column_percent'].max()) #Covarage across columns per the desired_count
 coverage = f"{round(last_percent_with_desired_count['cumulative_column_percent'].mean(),2)}+-{round(last_percent_with_desired_count['cumulative_column_percent'].std(),2)}"
 
 #Initial coverage (mean-+std  % of all inputs across columns) after synaptic-count filter
-desired_count_df = df[df['W_new']== desired_count].copy()
+desired_count_df = df[df['W_new']== min_desired_count].copy()
 last_percent_with_desired_count = pd.DataFrame(desired_count_df.groupby(['instance_post'])['cumulative_column_percent'].max()) #Covarage across columns per the desired_count
 initial_coverage = f"{round(last_percent_with_desired_count['cumulative_column_percent'].mean(),2)}+-{round(last_percent_with_desired_count['cumulative_column_percent'].std(),2)}"
 
-#Filtering out after calculatino of relative counts
+#Filtering out inidentfied segmetns (important: after the calculation of relative counts) 
 if 'N.I.' in df.values: # Removing non identified (N.I.) inputs
     df = df[df['type_pre']!= 'N.I.'].copy() # Getting rid of info rows with no connectomics data
 
@@ -255,8 +264,8 @@ if 'chunk-N.I.' in df.values: # Removing non identified (N.I.) inputs
     df = df[df['type_pre']!= 'chunk-N.I.'].copy() # Getting rid of info rows with no connectomics data
 
 #Final coverage (mean-+std % of all inputs across columns) after N.I-partners filter
-desired_count_df = df[df['W_new']== desired_count].copy()
-last_percent_with_desired_count = pd.DataFrame(desired_count_df.groupby(['instance_post'])['cumulative_column_percent'].max()) #Covarage across columns per the desired_count
+desired_count_df = df[df['W_new']== min_desired_count].copy()
+last_percent_with_desired_count = pd.DataFrame(desired_count_df.groupby(['instance_post'])['cumulative_column_percent'].max()) #Coverage across columns per the desired_count
 final_coverage = f"{round(last_percent_with_desired_count['cumulative_column_percent'].mean(),2)}+-{round(last_percent_with_desired_count['cumulative_column_percent'].std(),2)}"
 
 #Ranking the neurons again after previous filtering
@@ -276,8 +285,8 @@ cell_counts_df = pd.DataFrame(df.groupby(['instance_post']).agg({'type_pre':'cou
 #Printing useful information
 print(f'\nThe following column ids (n={len(id_column)}) are part of the analysis: \n {id_column}')
 print(f'\nInitial coverage (%) for syn >= 1: {coverage}')
-print(f'\nInitial coverage (%) for syn >= {desired_count}: {initial_coverage}')
-print(f'\nFinal coverage (%) after dropping N.I. for syn >= {desired_count}: {final_coverage}\n') 
+print(f'\nInitial coverage (%) for syn >= {min_desired_count}: {initial_coverage}')
+print(f'\nFinal coverage (%) after dropping N.I. for syn >= {min_desired_count}: {final_coverage}\n') 
 print(last_percent_with_desired_count)
 
 #%% 
@@ -297,7 +306,7 @@ for file in os.listdir(ExM_dataPath):
     curr_df['fly_ID'] = curr_df['fly_ID'] + '-ExM'
     # Convert 'W' column to integer
     curr_df['W_new'] = curr_df['W_new'].astype(int)
-    curr_df = curr_df[curr_df['W_new'] >= desired_count].copy()
+    curr_df = curr_df[curr_df['W_new'] >= min_desired_count].copy()
     curr_df.reset_index(inplace=True)
     ExM_absolut_counts[curr_df['type_pre'][0]] = curr_df
 
@@ -337,7 +346,7 @@ for instance in df['instance_post'].unique():
     curr_df['W_percentatge'] = N_percentatge.round(2) #rounding to the second decimal place
 
     #Synaptic strengh filter
-    curr_df = curr_df[curr_df['W_new']>=desired_count].copy()
+    curr_df = curr_df[curr_df['W_new']>=min_desired_count].copy()
 
     #For table across columns
     identity_dict[curr_df['instance_post'][0]] = curr_df['instance_pre'][0:last_input_neuron]
@@ -409,7 +418,7 @@ stats_ranked_df ['P50_rel'] = p50_rel_ls
 
 # General rank sorting
 #First axis: synaptic filtered heatmap, top-rank data
-top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
+top_rank_df = df[(df['W_new']>=min_desired_count) & (df['rank']<last_input_neuron)].copy()
 curr_df = top_rank_df[['rank', 'type_pre', 'instance_post' ]].copy()
 curr_df.set_index('instance_post', inplace = True)
 # Choosing the rank for 'type_pre' as the rank of the first ocurrance
@@ -508,11 +517,11 @@ top_rank_popular_neuron_ls
 #2) total percentatge of synaptic count across columns using top-rank neuron data or all data above syn threshold! 
 #Synaptic strengh filter
 #All data above syn threshold
-syn_df = df[df['W_new']>=desired_count].copy()
+syn_df = df[df['W_new']>=min_desired_count].copy()
 syn_type_df = pd.DataFrame(syn_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
 
 #Top-rank neuron data
-top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
+top_rank_df = df[(df['W_new']>=min_desired_count) & (df['rank']<last_input_neuron)].copy()
 top_rank_type_df = pd.DataFrame(top_rank_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
 type_df = pd.DataFrame(df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe
 
@@ -587,11 +596,11 @@ top_rank_popular_neuron_ls
 #2) total percentatge of synaptic count across columns using top-rank neuron data or all data above syn threshold! 
 #Synaptic strengh filter
 #All data above syn threshold
-syn_df = df[df['W_new']>=desired_count].copy()
+syn_df = df[df['W_new']>=min_desired_count].copy()
 syn_type_df = pd.DataFrame(syn_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
 
 #Top-rank neuron data
-top_rank_df = df[(df['W_new']>=desired_count) & (df['rank']<last_input_neuron)].copy()
+top_rank_df = df[(df['W_new']>=min_desired_count) & (df['rank']<last_input_neuron)].copy()
 top_rank_type_df = pd.DataFrame(top_rank_df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe, filtered
 type_df = pd.DataFrame(df.groupby(['instance_post', 'type_pre']).agg({'W_new':sum, 'column_percent':sum})) #Neuron type dataframe
 
@@ -644,12 +653,64 @@ if sort_by == 'median_abs_count':
     abs_column_order = syn_popularity_abs_df.median().sort_values(ascending=False).index.tolist()
     sorted_column_order = syn_popularity_abs_df.median().sort_values(ascending=False).index.tolist()
 
+#################################### Neurotransmitter anaylsis ####################################
+###################################################################################################
+# This section creates matrices for all partners with NT information (type ad polarity)
+
+#Useful function
+# Custom function to create the new column C based on columns A and B
+def create_column_c(row, A, B):
+    if row[B] != 0.0:
+        return 'None'
+    elif row[B] == '':
+        return ''
+    else:
+        return row[A]
+
+# Using the following number code (relavant for heatmap plots or any quantitative analysis between excitation (E) and inhibition (I)):
+# NT_code_dict = {'None' : 00 , 'GLUT' : 11, 'GABA' : 22, 'ACH' : 33, 'HIST' : 44, 'Exc.' : 1, 'Inh.' : -1}
+
+#NT code dicttionary
+NT_code_dict = {'None' : 1 ,'GLUT' : 2, 'GABA' : 3, 'ACH' : 4, 'HIST' : 5, 'Exc.' : 1, 'Inh.' : -1}
+# Apply the custom function to create the new NT_type based on Flywire information
+NT_df['NT_type'] = NT_df.apply(create_column_c, args=('From Flywire 1', 'From Flywire 2'), axis=1)
+# Create a new column C using the map method with the dictionary
+NT_df['NT_type_code'] = NT_df['NT_type'].map(NT_code_dict)
+NT_df['EI_code'] = NT_df['Excitatory_Inhibitory'].map(NT_code_dict)
+
+## Data frames with NT or EI label and code
+NT_type_df = NT_df[['Neurons', 'NT_type','NT_type_code']].copy()
+NT_polarity_df = NT_df[['Neurons', 'Excitatory_Inhibitory','EI_code']].copy()
+
+## Creating a matrix of NT_type and EI codes for all parterns 
+#  Create a new DataFrame with the same structure as syn_popularity_abs_df
+#  but use the NT_type_code values from NT_df
+syn_popularity_NT_type_df = syn_popularity_abs_df.copy()
+syn_popularity_NT_polarity_df = syn_popularity_abs_df.copy()
+
+# Filter the NT_df to include only rows with matching column names in syn_popularity_abs_df
+matching_neurons = syn_popularity_abs_df.columns.intersection(NT_df['Neurons'])
+filtered_NT_df = NT_df[NT_df['Neurons'].isin(matching_neurons)]
+
+# Iterate over the rows in NT_df and update corresponding columns in syn_popularity_NT_type_df
+for _, row in filtered_NT_df.iterrows():
+    neuron = row['Neurons']
+    nt_type = row['NT_type_code']
+    nt_polarity = row['EI_code']
+    syn_popularity_NT_type_df[neuron] = nt_type
+    syn_popularity_NT_polarity_df[neuron] = nt_polarity
+
+# Check for NaN values in syn_popularity_abs_df and set corresponding values in syn_popularity_NT_type_df to NaN
+nan_mask = syn_popularity_abs_df.isnull()
+syn_popularity_NT_type_df[nan_mask] = np.nan
+syn_popularity_NT_polarity_df[nan_mask] = np.nan
 
 
-########################################## Dicasrding OUTLIERS ########################################
+########################################## Dicarding OUTLIERS ######################################
+###################################################################################################
 # Here we discard ouliers based on the IQR using the Tukey's fences method
 # The IQR method calculates the range between the 25th and 75th percentiles of each column. 
-# By defining a multiplier (often 1.5), you can identify and remove outliers (or replace them by NaNs) outside a certain range.
+# By defining a multiplier (often 1.5), you remove outliers (or replace them by NaNs) outside a certain range.
 
 def remove_outliers(df, multiplier=1.5):
     # Calculate the first quartile (Q1) and third quartile (Q3) for each column
@@ -687,13 +748,10 @@ syn_popularity_abs_no_outliers_df = replace_outliers_with_nan(syn_popularity_abs
 
 
 
-
-
 ########################################## Defining sorting for plotting #####################################
 #############################################################################################################
 
 #Selecting for all neuron present in at least some proportion of columns (presence_threshold_neuron_filter) and keepind a certain order (sorted_column_order)
-
 presence_threshold_sorted_column_order = [neuron for neuron in sorted_column_order if neuron in presence_threshold_neuron_filter]
 
 if analyzing_cluster:
@@ -941,12 +999,13 @@ cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim .values)
 cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered, index=_data_reordered_cosine_sim.index, columns=_data_reordered_cosine_sim.index)
 
 
-################################################ DENDROGRAM CLUSTERING #########################################
+###################################### DENDROGRAM CLUSTERING ######################################
+###################################################################################################
 
 #TODO: define clusters based on branches of the dendogram using one of the options:
 # - Elbow Method
 # - Gap Statistic
-# - Silhouette Analysis
+# - Silhouette Analysis (DONE)
 
 if cluster_with_dendrogram:
 
@@ -1023,8 +1082,8 @@ curr_abs_stats_no_ouliers_df['mean'] = curr_abs_stats_no_ouliers_df.mean(axis=1)
 
 
 
-########################################### DIMENTIONALITY Reduction ##########################################
-##################################################   PCA   ####################################################
+######################################### DIMENTIONALITY Reduction #######################################
+################################################   PCA   #################################################
 #For relative counts:
 # Data
 rel_data = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()
@@ -1078,9 +1137,7 @@ abs_eigvecs = abs_eigvecs[:,k]
 
 
 #%%
-
-
-############################################# PRINT STATEMENTs #####################################
+######################################## PRINT STATEMENTs #########################################
 ## Generating text
 counts_mean = syn_df.groupby(['instance_post']).agg({'W_new': sum}).mean()[0]
 counts_std = syn_df.groupby(['instance_post']).agg({'W_new': sum}).std()[0]
@@ -1318,7 +1375,7 @@ color_present = sns.color_palette(hex_color, as_cmap=False)[-1] #
 # First axis
 sorted_abs_presence_absence_df.set_index('Presynaptic neuron').plot(kind='bar', stacked=True, color=[color_present, color_absent], 
                                                                     edgecolor = None, ax = axs[0],legend=False)
-axs[0].set_title(f'{neuron_of_interest}, Presence / absence across columns, syn>={desired_count}')
+axs[0].set_title(f'{neuron_of_interest}, Presence / absence across columns, syn>={min_desired_count}')
 #axs[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 axs[0].set_xlabel('Presynaptic neuron')
 axs[0].set_ylabel('Number of columns')
@@ -1329,7 +1386,7 @@ axs[0].spines['top'].set_visible(False)
 # Next axis
 sorted_rel_presence_absence_df.set_index('Presynaptic neuron').plot(kind='bar', stacked=True, color=[color_present, color_absent], 
                                                                     edgecolor = None, ax = axs[1],legend=False)
-axs[1].set_title(f'{neuron_of_interest}, Presence / absence across columns, syn>={desired_count}')
+axs[1].set_title(f'{neuron_of_interest}, Presence / absence across columns, syn>={min_desired_count}')
 #axs[1].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 axs[1].set_xlabel('Presynaptic neuron')
 axs[1].set_ylabel('% of columns')
@@ -1345,7 +1402,7 @@ sorted_thr_rel_presence_absence_df['Presynaptic neuron_cat'] = pd.Categorical(
 sorted_thr_rel_presence_absence_df.sort_values('Presynaptic neuron_cat', inplace = True)
 sorted_thr_rel_presence_absence_df.set_index('Presynaptic neuron').plot(kind='bar', stacked=True, color=[color_present, color_absent], 
                                                                     edgecolor = "black", ax = axs[2],legend=False)
-axs[2].set_title(f'{neuron_of_interest}, Presence / absence across columns above {presence_threshold}, syn>={desired_count}, sorted by {sort_by}')
+axs[2].set_title(f'{neuron_of_interest}, Presence / absence across columns above {presence_threshold}, syn>={min_desired_count}, sorted by {sort_by}')
 #axs[2].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 axs[2].set_xlabel('Presynaptic neuron')
 axs[2].set_ylabel('% of columns')
@@ -1710,7 +1767,7 @@ _palette = sns.color_palette(hex_color, as_cmap=True)
 
 heatmap = sns.heatmap(cmap =_palette, data = _data, vmin=0, vmax=1, linewidths=0.2,
                 linecolor='k', cbar=False, ax = axs, square=True) 
-axs.set_title(f'{neuron_of_interest}, Binary: presence - absence, syn>={desired_count}, sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, Binary: presence - absence, syn>={min_desired_count}, sorted by {sort_by}')
 axs.set_ylabel('Column')
 axs.set_xlabel('Presynaptic neuron')
 
@@ -1770,7 +1827,7 @@ _palette = sns.color_palette(color_palette_name,max_count)
 
 #Plot
 heatmap = sns.heatmap(cmap=_palette, data=_data, vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, Instance count, syn>={desired_count}, sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, Instance count, syn>={min_desired_count}, sorted by {sort_by}')
 axs.set_ylabel('Columns')
 axs.set_xlabel('Presynaptic neurons')
 
@@ -1809,7 +1866,7 @@ _palette = sns.color_palette(color_palette_name, max_count)
 
 # Plot (rotated 90 degrees)
 heatmap = sns.heatmap(cmap=_palette, data=_data.transpose(), vmin=1, vmax=max_count+1, cbar_kws={"ticks": list(range(1, max_count+1, 1)), "shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, Instance count, syn>={desired_count}, sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, Instance count, syn>={min_desired_count}, sorted by {sort_by}')
 axs.set_xlabel('Columns')
 axs.set_ylabel('Presynaptic neurons')
 
@@ -1851,7 +1908,7 @@ from matplotlib.ticker import MultipleLocator
 
 #Data
 _data = top_rank_popularity_rel_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
-_vmin = desired_count
+_vmin = min_desired_count
 _vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
 bin_width = 3# 5
 _palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width)) # n_colors=int(roundup(max(_data.max()))/bin_width)
@@ -1863,7 +1920,7 @@ fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm)) #figsize=(20*cm
 #First axis
 
 sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, count %, (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, count %, (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_ylabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_xlabel('Presynaptic neuron')
@@ -1908,7 +1965,7 @@ fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
 #First axis
 # Plot (rotated 90 degrees)
 sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, count %, (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, count %, (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron')
@@ -1947,12 +2004,12 @@ plt.close(fig)
 
 ################################################### ABSOLUTE COUNTS  #################################################
 # Visualization of presynaptic contacts for all columns
-#Heatmap of presynaptic partners  colorcoded by absolute synaptic count
+# Heatmap of presynaptic partners  colorcoded by absolute synaptic count
 
 
 #Data
 _data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
-_vmin = desired_count
+_vmin = min_desired_count
 _vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
 bin_width = 3# 5
 _palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width))
@@ -1964,7 +2021,7 @@ fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm)) #figsize=(20*cm
 #First axis
 
 sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_ylabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_xlabel('Presynaptic neuron')
@@ -2007,7 +2064,7 @@ fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
 #First axis
 # Plot (rotated 90 degrees)
 sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = _data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column')
 #axs.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron')
@@ -2053,7 +2110,7 @@ fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(30*cm, 15*cm))
 #First axis
 # Plot (rotated 90 degrees)
 sns.heatmap(cmap = _palette, vmin=_vmin, vmax=_vmax, data = ordered_data.transpose(), cbar_kws={"shrink": 0.25}, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, absolute count, (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column (sorted by cosine similarity)')
 #axs.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron (sorted by pearson correlation)')
@@ -2105,7 +2162,7 @@ _palette = sns.color_palette("tab20",n_colors=total_num_ranks)
 
 #First axis
 sns.heatmap(cmap = _palette, vmin=0, vmax=total_num_ranks, cbar_kws={"ticks":list(range(1,top_rank_df['rank'].max()+2,1)),"shrink": 0.25}, data = _data, ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_ylabel('Column')
 #axes.set_yticklabels(id_column)
 axs.set_xlabel('Presynaptic neuron')
@@ -2145,7 +2202,7 @@ _palette = sns.color_palette("tab20",n_colors=total_num_ranks)
 
 #First axis
 sns.heatmap(cmap = _palette, vmin=0, vmax=total_num_ranks, cbar_kws={"ticks":list(range(1,top_rank_df['rank'].max()+2,1)),"shrink": 0.25}, data = _data.transpose(), ax=axs, square=True)
-axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={desired_count}), sorted by {sort_by}')
+axs.set_title(f'{neuron_of_interest}, RANK neurons (syn>={min_desired_count}), sorted by {sort_by}')
 axs.set_xlabel('Column')
 #axes.set_yticklabels(id_column)
 axs.set_ylabel('Presynaptic neuron')
@@ -2175,6 +2232,190 @@ if save_figures:
     print('FIGURE: Visualization of ranks plotted horizontally and saved')
 plt.close(fig)
 
+####################################### NEUROTRANSMITTER IDENTITY PLOTS ##########################################
+# Visualization of neurotranmitter identity for all columns
+# Heatmap of presynaptic partners  colorcoded by neurotransmitter (NT) type or polarity code
+
+##########################################       IDENTITY      ###################################################
+# Data
+_data = syn_popularity_NT_type_df[presence_threshold_sorted_column_order].copy()
+NT_label_dict = {'None' : 1 ,'GLUT' : 2, 'GABA' : 3, 'ACH' : 4}
+
+#Figure
+fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
+_palette = sns.color_palette('Set2')
+palette = sns.color_palette([_palette[i] for i in NT_label_dict.values()])
+
+# Plot
+heatmap = sns.heatmap(data=_data, cmap=palette, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+
+# Set custom color bar labels
+ticks = [NT_label_dict[label] for label in NT_label_dict]
+cbar = heatmap.collections[0].colorbar
+cbar.set_ticks(ticks)
+cbar.set_ticklabels(list(NT_label_dict.keys()))
+
+axs.set_title(f'{neuron_of_interest}, NT identity, syn>={min_desired_count}, sorted by {sort_by}')
+axs.set_ylabel('Columns')
+axs.set_xlabel('Presynaptic neurons')
+
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
+# Add ticks in the Y-axis for each row in "_data"
+axs.set_yticks(range(len(_data.index)))
+axs.set_yticklabels(_data.index)
+
+# Add ticks in the X-axis for each row in "_data"
+axs.set_xticks(range(len(_data.columns)))
+axs.set_xticklabels(_data.columns)
+
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Identity_NT_{dataset_name}_{neuron_of_interest}_{sort_by}-vertical.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of neurotransmitter identiyt plotted vertically and saved')
+plt.close(fig)
+
+
+#Figure
+fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(30*cm, 15*cm))
+_palette = sns.color_palette('Set2')
+palette = sns.color_palette([_palette[i] for i in NT_label_dict.values()])
+
+# Plot
+heatmap = sns.heatmap(data=_data.transpose(), cmap=palette, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+
+# Set custom color bar labels
+ticks = [NT_label_dict[label] for label in NT_label_dict]
+cbar = heatmap.collections[0].colorbar
+cbar.set_ticks(ticks)
+cbar.set_ticklabels(list(NT_label_dict.keys()))
+
+axs.set_title(f'{neuron_of_interest}, NT identity, syn>={min_desired_count}, sorted by {sort_by}')
+axs.set_ylabel('Presynaptic neurons')
+axs.set_xlabel('Columns')
+
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
+
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+
+# Add ticks in the Y-axis for each row in "_data"
+axs.set_yticks(range(len(_data.transpose().index)))
+axs.set_yticklabels(_data.transpose().index)
+
+# Add ticks in the X-axis for each row in "_data"
+axs.set_xticks(range(len(_data.transpose().columns)))
+axs.set_xticklabels(_data.transpose().columns)
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Identity_NT_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of neurotransmitter identiyt plotted horizontally and saved')
+plt.close(fig)
+
+
+##########################################      POLARITY     ###################################################
+# Data
+_data = syn_popularity_NT_polarity_df[presence_threshold_sorted_column_order].copy()
+NT_label_dict = {'Exc.' : 1 ,'Inh.':-1}
+
+#Figure
+fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm))
+palette = ['red', 'blue']
+
+# Plot
+heatmap = sns.heatmap(data=_data, cmap=palette, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+
+# Set custom color bar labels
+ticks = [NT_label_dict[label] for label in NT_label_dict]
+cbar = heatmap.collections[0].colorbar
+cbar.set_ticks(ticks)
+cbar.set_ticklabels(list(NT_label_dict.keys()))
+
+axs.set_title(f'{neuron_of_interest}, NT polarity, syn>={min_desired_count}, sorted by {sort_by}')
+axs.set_ylabel('Columns')
+axs.set_xlabel('Presynaptic neurons')
+
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.8)
+
+# Add ticks in the Y-axis for each row in "_data"
+axs.set_yticks(range(len(_data.index)))
+axs.set_yticklabels(_data.index)
+
+# Add ticks in the X-axis for each row in "_data"
+axs.set_xticks(range(len(_data.columns)))
+axs.set_xticklabels(_data.columns)
+
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Polarity_NT_{dataset_name}_{neuron_of_interest}_{sort_by}-vertical.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of neurotransmitter identiyt plotted vertically and saved')
+plt.close(fig)
+
+
+#Figure
+fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(30*cm, 15*cm))
+palette = ['red', 'blue']
+
+# Plot
+heatmap = sns.heatmap(data=_data.transpose(), cmap=palette, cbar_kws={"shrink": 0.25}, ax=axs, square=True)
+
+# Set custom color bar labels
+ticks = [NT_label_dict[label] for label in NT_label_dict]
+cbar = heatmap.collections[0].colorbar
+cbar.set_ticks(ticks)
+cbar.set_ticklabels(list(NT_label_dict.keys()))
+
+axs.set_title(f'{neuron_of_interest}, NT polarity, syn>={min_desired_count}, sorted by {sort_by}')
+axs.set_ylabel('Presynaptic neurons')
+axs.set_xlabel('Columns')
+
+# Reducing font size of x-axis tick labels
+for tick_label in heatmap.get_xticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.2)
+
+# Reducing font size of y-axis tick labels
+for tick_label in heatmap.get_yticklabels():
+    tick_label.set_fontsize(tick_label.get_fontsize() * 0.5)
+
+# Add ticks in the Y-axis for each row in "_data"
+axs.set_yticks(range(len(_data.transpose().index)))
+axs.set_yticklabels(_data.transpose().index)
+
+# Add ticks in the X-axis for each row in "_data"
+axs.set_xticks(range(len(_data.transpose().columns)))
+axs.set_xticklabels(_data.transpose().columns)
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Polarity_NT_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of neurotransmitter identiyt plotted horizontally and saved')
+plt.close(fig)
 
 
 ################################################### COSINE SIMILARITY #################################################
@@ -2246,7 +2487,7 @@ _data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy(
 bin_width = 5
 binned_data = np.floor(_data / bin_width) * bin_width
 # Setting limits and colors
-_vmin = desired_count
+_vmin = min_desired_count
 _vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
 bin_width = 3# 5
 _palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width))
@@ -2265,7 +2506,7 @@ axs[0].set_ylabel('Count of absolut counts')
 # Set the x-axis tick labels
 axs[0].set_xticklabels(value_counts.T.index, rotation=90)
 # Set the plot title
-axs[0].set_title(f'{neuron_of_interest}, absolute-count counts, (syn>={desired_count}), sorted by {sort_by}')
+axs[0].set_title(f'{neuron_of_interest}, absolute-count counts, (syn>={min_desired_count}), sorted by {sort_by}')
 # Remove spines
 axs[0].spines['right'].set_visible(False)
 axs[0].spines['top'].set_visible(False)
@@ -2294,7 +2535,7 @@ axs[1].set_ylabel('Rank counts')
 # Set the x-axis tick labels
 axs[1].set_xticklabels(value_counts.T.index, rotation=90)
 # Set the plot title
-axs[1].set_title(f'{neuron_of_interest}, Rank counts, (syn>={desired_count}), sorted by {sort_by}')
+axs[1].set_title(f'{neuron_of_interest}, Rank counts, (syn>={min_desired_count}), sorted by {sort_by}')
 # Remove spines
 axs[1].spines['right'].set_visible(False)
 axs[1].spines['top'].set_visible(False)
@@ -2309,7 +2550,7 @@ sorted_thr_rel_presence_absence_df['Presynaptic neuron_cat'] = pd.Categorical(
 sorted_thr_rel_presence_absence_df.sort_values('Presynaptic neuron_cat', inplace = True)
 sorted_thr_rel_presence_absence_df.set_index('Presynaptic neuron').plot(kind='bar', stacked=True, color=[color_present, color_absent], 
                                                                     edgecolor = "black", ax = axs[2],legend=False)
-axs[2].set_title(f'{neuron_of_interest}, Presence above {int(presence_threshold*100)}%, syn>={desired_count}, sorted by {sort_by}')
+axs[2].set_title(f'{neuron_of_interest}, Presence above {int(presence_threshold*100)}%, syn>={min_desired_count}, sorted by {sort_by}')
 #axs[2].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 axs[2].set_xlabel('Presynaptic neuron')
 axs[2].set_ylabel('% of columns')
@@ -2342,7 +2583,7 @@ correlation_rel_no_NaN_df.replace(np.NaN,1.0, inplace = True)
 _palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
 g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
 
-g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, % of count(syn>={desired_count})') 
+g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, % of count(syn>={min_desired_count})') 
 g.ax_heatmap.set_xlabel('Presynaptic neuron')
 g.ax_heatmap.set_ylabel('Presynaptic neuron')
 g.fig.subplots_adjust(top=0.9)
@@ -2364,7 +2605,7 @@ correlation_abs_no_NaN_df.replace(np.NaN,1.0, inplace = True)
 _palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
 g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
 
-g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, absolute count(syn>={desired_count})') 
+g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, absolute count(syn>={min_desired_count})') 
 g.ax_heatmap.set_xlabel('Presynaptic neuron')
 g.ax_heatmap.set_ylabel('Presynaptic neuron')
 g.fig.subplots_adjust(top=0.9)
@@ -2480,7 +2721,7 @@ fig.tight_layout(pad=10) # Adding some space between subplots
 # First axes 
 
 sns.boxplot(data = _data, ax = axs[0])  # old sorting: _data[_data.max().sort_values(ascending = False).index]
-axs[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={desired_count}), sorted by {sort_by}')
+axs[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={min_desired_count}), sorted by {sort_by}')
 axs[0].set_ylabel('Synaptic count (%) ', size = 12)
 axs[0].set_xlabel('Presynaptic neuron', size = 12)
 axs[0].set_xticklabels(_data, rotation=90, size = 10) # old sorting: _data[_data.max().sort_values(ascending = False).index]
@@ -2493,7 +2734,7 @@ _data = syn_popularity_abs_df.copy()[presence_threshold_sorted_column_order]#  f
 
 # Next axes 
 sns.boxplot(data = _data, ax = axs[1]) # old sorting: _data[_data.max().sort_values(ascending = False).index]
-axs[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={desired_count}), sorted by {sort_by}')
+axs[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={min_desired_count}), sorted by {sort_by}')
 axs[1].set_ylabel('Synaptic count', size = 12)
 axs[1].set_xlabel('Presynaptic neuron', size = 12)
 axs[1].set_xticklabels(_data, rotation=90, size = 10) # old sorting: _data[_data.max().sort_values(ascending = False).index]
@@ -2597,13 +2838,13 @@ fig.tight_layout(pad=8) # Adding some space between subplots
 if exclude_outliers:
     _data = curr_rel_stats_no_ouliers_df.round(2).copy()[presence_threshold_sorted_column_order+['mean']]#  filtering based on " presence_threshold"
     figure_title = f'\Variability-measures_{dataset_name}_{neuron_of_interest}_{sort_by}_no_outliers.pdf'
-    axs[0,0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={desired_count}), sorted by {sort_by}, no outliers')
-    axs[0,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={desired_count}), sorted by {sort_by}, no outliers')
+    axs[0,0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={min_desired_count}), sorted by {sort_by}, no outliers')
+    axs[0,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={min_desired_count}), sorted by {sort_by}, no outliers')
 else: 
     _data = curr_rel_stats_df.round(2).copy()[presence_threshold_sorted_column_order+['mean']]#  filtering based on " presence_threshold"
     figure_title = f'\Variability-measures_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
-    axs[0,0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={desired_count}), sorted by {sort_by}')
-    axs[0,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={desired_count}), sorted by {sort_by}')
+    axs[0,0].set_title(f'{neuron_of_interest} partners, variability measure: std, % of count(syn>={min_desired_count}), sorted by {sort_by}')
+    axs[0,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, % of count(syn>={min_desired_count}), sorted by {sort_by}')
 
 #First axis
 sns.barplot(data = _data.iloc[[2]], ax = axs[0,0] )
@@ -2632,12 +2873,12 @@ sns.despine(left=False, bottom=False)
 #Data
 if exclude_outliers:
     _data = curr_abs_stats_no_ouliers_df.round(2).copy()[presence_threshold_sorted_column_order+['mean']]#  filtering based on " presence_threshold"
-    axs[1,0].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={desired_count}), sorted by {sort_by}, no outliers')
-    axs[1,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={desired_count}), sorted by {sort_by}, no outliers')
+    axs[1,0].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={min_desired_count}), sorted by {sort_by}, no outliers')
+    axs[1,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={min_desired_count}), sorted by {sort_by}, no outliers')
 else: 
     _data = curr_abs_stats_df.round(2).copy()[presence_threshold_sorted_column_order+['mean']]#  filtering based on " presence_threshold"
-    axs[1,0].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={desired_count}), sorted by {sort_by}')
-    axs[1,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={desired_count}), sorted by {sort_by}')
+    axs[1,0].set_title(f'{neuron_of_interest} partners, variability measure: std, absolute count(syn>={min_desired_count}), sorted by {sort_by}')
+    axs[1,1].set_title(f'{neuron_of_interest} partners, variability measure: C.V, absolute count(syn>={min_desired_count}), sorted by {sort_by}')
 
 #Next axis
 sns.barplot(data = _data.iloc[[2]], ax = axs[1,0] )
@@ -2698,7 +2939,7 @@ for i, partner in enumerate(partner_list):
         cumulative=False, stat="percent", common_norm=False, legend=False,
         ax=axs[i])
 
-    axs[i].set_title(f'{partner}>{neuron_of_interest}, Column counts histogram ExM and EM, syn>={desired_count}')
+    axs[i].set_title(f'{partner}>{neuron_of_interest}, Column counts histogram ExM and EM, syn>={min_desired_count}')
     axs[i].set_ylabel('Column count (percent)', size=10)
     axs[i].set_xlabel('Presynaptic contacts', size=10)
     axs[i].tick_params(axis='x', labelsize=8)
@@ -2729,7 +2970,7 @@ plt.close(fig)
 ##Plotting  the square-root eigenvalue spectrum
 fig,axs = plt.subplots(nrows =1, ncols = 1)
 axs.plot(abs_eigvals/np.sum(abs_eigvals) * 100,'-o',color='black')
-axs.set_title(f'{neuron_of_interest}, Eigenvalue spectrum, absolute counts syn>={desired_count}')
+axs.set_title(f'{neuron_of_interest}, Eigenvalue spectrum, absolute counts syn>={min_desired_count}')
 axs.set_xlabel('Dimensions')
 axs.set_ylabel('Explained-variability (percentage)')
 
@@ -2763,7 +3004,7 @@ for i, category in enumerate(unique_categories):
     y = pca_coords[1][category_mask]
     axs.scatter(x, y, color=palette[i], label=category)
 # Set the title, labels, and legend
-axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2, absolute-counts, syn>={desired_count}')
+axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2, absolute-counts, syn>={min_desired_count}')
 axs.set_xlabel('PCA1')
 axs.set_ylabel('PCA2')
 axs.legend(title=category_column)
@@ -2805,7 +3046,7 @@ for i, category in enumerate(unique_categories):
     axs.scatter(x, y, z, color=palette[i], label=category)
 
 # Set the title, labels, and legend
-axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2 vs PCA3, absolute-counts, syn>={desired_count}')
+axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2 vs PCA3, absolute-counts, syn>={min_desired_count}')
 axs.set_xlabel('PCA1')
 axs.set_ylabel('PCA2')
 axs.set_zlabel('PCA3')
@@ -3163,7 +3404,7 @@ if instance_count_plot:
 
 
 ##############################################################################################################
-##############################################################################################################
+#####################################    OLD (perhaps useful) CODE BELOW    ##################################
 ##############################################################################################################
 
 #Temp CODE, Debugging
@@ -3171,20 +3412,18 @@ if instance_count_plot:
 # tem_df = pd.read_csv(r'E:\Connectomics-Data\FlyWire\Excels\optic_lobe_ids_left.csv')
 # ol_id_list = tem_df.columns.tolist()
 
-def non_match_elements(list_a, list_b):
-     non_match = []
-     for i in list_a:
-         if i not in list_b:
-             non_match.append(i)
-     return non_match
+# def non_match_elements(list_a, list_b):
+#      non_match = []
+#      for i in list_a:
+#          if i not in list_b:
+#              non_match.append(i)
+#      return non_match
 
 
 # non_match = non_match_elements(ol_id_list, id_column,)
 # print("No match elements: ", non_match)
 
 # %%
-# # OLD CODE
-
 # ################################################ BINARY COUNTs ###############################################
 # ################################# PLOTTING EACH  NEURON IN DIFFERENT PDF PAGES ###############################
 
@@ -3239,6 +3478,7 @@ def non_match_elements(list_a, list_b):
 # print(f"Plots saved in {outputPath}")
 
 
+# %%
 # ########################################### DIMENTIONALITY Reduction ##########################################
 # ###############################################################################################################
 # from sklearn.decomposition import PCA
@@ -3306,6 +3546,7 @@ def non_match_elements(list_a, list_b):
 
 
 
+# %%
 # ################################################## PCA PLOTS ##################################################
 # #Plotting PCA plots
 
@@ -3315,12 +3556,12 @@ def non_match_elements(list_a, list_b):
 
 # #First Axis
 # sns.scatterplot(x="pca1", y="pca2", data=results_rel_columns, ax = axs[0])
-# axs[0].set_title(f'{neuron_of_interest}, PCA - count % of popular neurons (syn>={desired_count})')
+# axs[0].set_title(f'{neuron_of_interest}, PCA - count % of popular neurons (syn>={min_desired_count})')
 # axs[0].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 
 # #Next Axis
 # sns.scatterplot(x="pca1", y="pca2", data=results_abs_columns, ax = axs[1])
-# axs[1].set_title(f'{neuron_of_interest}, PCA - absolute count of popular neurons (syn>={desired_count})')
+# axs[1].set_title(f'{neuron_of_interest}, PCA - absolute count of popular neurons (syn>={min_desired_count})')
 # axs[1].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 
 
@@ -3333,6 +3574,8 @@ def non_match_elements(list_a, list_b):
 #     print('FIGURE: PCA plotted and saved')
 # plt.close(fig)
 
+
+# %%
 # ######################################### DISTRIBUTIONS FROM PERMUTATIONS ########################################
 
 # # Valid code:
