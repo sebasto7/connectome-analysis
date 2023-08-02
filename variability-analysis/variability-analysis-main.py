@@ -185,6 +185,7 @@ save_figures = True
 exclude_outliers = True # Plot variability without outliers
 instance_count_plot = False
 
+
 #%% 
 ############################################# USER INFORMATION ################################################
 ###############################################################################################################
@@ -195,19 +196,19 @@ desired_coverage = 80 # in percent
 plus_minus = 5 # in percent
 
 #Synaptic counts
-min_desired_count = 3 # minimun number of synapses to consider in the analysis # Tm1:4, Tm9:3, Tm2:4, 
+min_desired_count = 3 # minimun number of synapses to consider in the analysis # Tm1:4, Tm9:3, Tm2:4, Tm4:3
 num_type_copies_min = 2 #Number for neuron copies relevant for the low-synapses partners (currently not in use)
 presence_threshold = 0.05 # If a partner is in less than 5% of the columns, it will be discarted for further visualizations
 
 #Neuron counts
-desired_quantile = 0.8 # selected quantile for neuron counts
+desired_quantile = 0.8 # selected quantile for neuron counts (currently not in use)
 
 #Main presynaptic partner
 last_input_neuron = 1000 # last input to be considered in summary dataframes across columns
 
 #Dorsal-ventral filter
-d_v_filter = False
-selection_area = ''
+d_v_filter = False # 
+selection_area = '' # 'D', 'V'
 
 #Analysis of heterogeneous partners only:
 discard_homogeneous = False # To analyse all partnes, make it False
@@ -222,17 +223,17 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'L'
+optic_lobe = 'L'  # 'L', 'R', 'L_R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
-mesh_ME = 'ME_R' #
-mesh_LO = 'LO_R' #
+mesh_ME = 'ME_R' # 'ME_R' , 'ME_L' 
+mesh_LO = 'LO_R' # 'LO_R' , 'LO_L'
 mesh_azim = -18# -18 for ME_R, 16 for ME_L
 mesh_elev = -148 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 # Cluster information
-analyzing_cluster = True
+analyzing_cluster = False
 cluster_id = 'C5'
 
 
@@ -254,7 +255,7 @@ txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Con
 fileName_txt = f'Tm9_healthy_L3_{optic_lobe}.txt' # 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 # Healthy columns based on lamina detachement and damage L3s
-keep_only_healthy_columns = False # Only good if your data subselection does not considere it already.
+keep_only_healthy_columns = False # Only good if your data subselection does not considere it already (not being used)
 
 
 #Expansion microscopy
