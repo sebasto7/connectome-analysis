@@ -273,7 +273,7 @@ output_dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'#r'C:\Co
 # When running data just for a cluster, making sure this option are like this:
 if analyzing_cluster:
     print(f'\nAnalyzing cluster: {cluster_id}')
-    subselection_file = True
+    subselection_filter = True
     fileName_txt = f'Tm9_cosine_similarity_{cluster_id}_{optic_lobe}.txt'
     cluster_with_dendrogram = False
     discard_homogeneous = False
@@ -2043,7 +2043,7 @@ _data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy(
 _vmin = min_desired_count
 _vmax= 48 # 48 is a common multiple of 3 and 4 #roundup(max(_data.max())) # rounding up to the next ten
 bin_width = 3# 5
-_palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width))
+_palette = sns.color_palette("gist_ncar",n_colors=int(_vmax/bin_width)) # 'rocket_r'
 
 #Figure
 fig, axs = plt.subplots(nrows=1,ncols=1, figsize=(10*cm, 20*cm)) #figsize=(20*cm, 40*cm)), figsize=(40*cm, 80*cm))
@@ -2927,6 +2927,7 @@ if save_figures:
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of variability measures')
 plt.close(fig)
+
 
 
 
