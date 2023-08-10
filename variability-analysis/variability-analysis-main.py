@@ -174,8 +174,11 @@ cm = 1/2.54  # centimeters in inches
 #Sorting options for plots
 sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%'
 
+#Choosing type of data for cosine similarity and cluster analysis
+relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts' 
+
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
-category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
+category_column = 'hemisphere'# 'dorso-ventral', 'hemisphere'
 #Colors
 color_cat_set = "Set1" # select a set for a seaborn color palette
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
@@ -211,7 +214,7 @@ d_v_filter = False #
 selection_area = '' # 'D', 'V'
 
 #Analysis of heterogeneous partners only:
-discard_homogeneous = False # To analyse all partnes, make it False
+discard_homogeneous = True   # To analyse all partnes, make it False
 thr_homogenous = 0.9 # Threshold about which a partner is defined as homogenous (e.g present in 90% or 75% of the columns)
 
 #Clustering options
@@ -234,8 +237,7 @@ instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 # Cluster information
 analyzing_cluster = False
-cluster_id = 'C5'
-
+cluster_id = 'C1'
 
 #Path and file
 PC_disc = 'C'
@@ -296,6 +298,8 @@ if analyzing_cluster:
     processed_dataPath = os.path.join(output_dataPath,file_name)
     dataset_abs_df = pd.read_excel(processed_dataPath, sheet_name='Absolut_counts', index_col = 0)
     dataset_abs_df = dataset_abs_df[user_defined_sorted_column_order].copy()
+    dataset_rel_df = pd.read_excel(processed_dataPath, sheet_name='Relative_counts', index_col = 0)
+    dataset_rel_df = dataset_rel_df[user_defined_sorted_column_order].copy()
     
 
 #%% 
@@ -928,57 +932,112 @@ sorted_correlation_abs_no_NaN_df.replace(1.0, np.NaN, inplace = True)
 #TODO SO far only done for correlation related to abs counts. Do it eventually also for relative counts
 
 if permutation_analysis:
-    # Data
-    ### Absolute counts
-    curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
-    curr_df = curr_df.fillna(0).copy()
-    if analyzing_cluster:
-        curr_dataset_abs_df = dataset_abs_df.fillna(0).copy()
-    else:
-        curr_dataset_abs_df = curr_df.copy() 
+    if relative_or_absolute == 'absolute-counts':
+        ### Absolute counts
+        # Data
+        curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+        curr_df = curr_df.fillna(0).copy()
+        if analyzing_cluster:
+            curr_dataset_abs_df = dataset_abs_df.fillna(0).copy()
+        else:
+            curr_dataset_abs_df = curr_df.copy() 
 
-    # Columns to be compared
-    column_names = curr_df.columns.tolist()
+        # Columns to be compared
+        column_names = curr_df.columns.tolist()
 
-    # In case you want to run it for different subsets of the data, code need to be modify for defining column_names
-    clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+        # In case you want to run it for different subsets of the data, code need to be modify for defining column_names
+        clusters_list = [curr_df]  # Insert your actual cluster DataFrames
 
-    # Initialize empty DataFrames to store observed correlations and p-values
-    observed_corr_df = pd.DataFrame(columns=column_names, index=column_names)
-    p_value_permutation_df = pd.DataFrame(columns=column_names, index=column_names)
+        # Initialize empty DataFrames to store observed correlations and p-values
+        observed_corr_abs_df = pd.DataFrame(columns=column_names, index=column_names)
+        p_value_permutation_abs_df  = pd.DataFrame(columns=column_names, index=column_names)
 
-    # Perform permutation test for each cluster and each pair of columns
-    for i, cluster_df in enumerate(clusters_list):
-        #print(f"Cluster {i + 1}:")
-        print(f"Doing permutation test for all pairs...")
-        for column_pair in combinations(column_names, 2):
-            column1_name, column2_name = column_pair
-            #print(f"Pair: {column1_name} and {column2_name}")
-            observed_corr, p_value, shuffled_corrs = permutation_test(cluster_df, curr_dataset_abs_df, column1_name, column2_name, num_permutations, _seed)
-            
-            # Save observed correlation and p-value in the corresponding DataFrames
-            observed_corr_df.loc[column1_name, column2_name] = observed_corr
-            observed_corr_df.loc[column2_name, column1_name] = observed_corr
-            p_value_permutation_df.loc[column1_name, column2_name] = p_value
-            p_value_permutation_df.loc[column2_name, column1_name] = p_value
+        # Perform permutation test for each cluster and each pair of columns
+        for i, cluster_df in enumerate(clusters_list):
+            #print(f"Cluster {i + 1}:")
+            print(f"\nDoing permutation test for all pairs...\n")
+            for column_pair in combinations(column_names, 2):
+                column1_name, column2_name = column_pair
+                #print(f"Pair: {column1_name} and {column2_name}")
+                observed_corr, p_value, shuffled_corrs = permutation_test(cluster_df, curr_dataset_abs_df, column1_name, column2_name, num_permutations, _seed)
+                
+                # Save observed correlation and p-value in the corresponding DataFrames
+                observed_corr_abs_df.loc[column1_name, column2_name] = observed_corr
+                observed_corr_abs_df.loc[column2_name, column1_name] = observed_corr
+                p_value_permutation_abs_df .loc[column1_name, column2_name] = p_value
+                p_value_permutation_abs_df .loc[column2_name, column1_name] = p_value
 
-    observed_corr_df = observed_corr_df.apply(pd.to_numeric, errors='coerce')
-    p_value_permutation_df = p_value_permutation_df.apply(pd.to_numeric, errors='coerce')
+        observed_corr_abs_df = observed_corr_abs_df.apply(pd.to_numeric, errors='coerce')
+        p_value_permutation_abs_df  = p_value_permutation_abs_df .apply(pd.to_numeric, errors='coerce')
 
 
-### Keeping the p-values from the pearson correlations only if the permutation test was passed:
-# Create a boolean mask where values in p_value_permutation_df are less than 0.05
-mask_permutation = p_value_permutation_df < 0.05
-mask_correlation = p_values_correlation_abs_no_NaN_df < 0.05
-# Create a new DataFrame with the same columns and indexes as p_values_correlation_abs_no_NaN_df
-p_values_correlation_abs_after_permutation_df = pd.DataFrame(index=p_values_correlation_abs_no_NaN_df.index,
-                                                         columns=p_values_correlation_abs_no_NaN_df.columns)
-# Set the values in the new DataFrame to "" where the mask is False (values in p_value_permutation_df >= 0.05)
-p_values_correlation_abs_after_permutation_df[~mask_permutation] = ""
-# Set the values in the new DataFrame to the values in p_values_correlation_abs_no_NaN_df where the mask is True
-p_values_correlation_abs_after_permutation_df[mask_permutation] = p_values_correlation_abs_no_NaN_df[mask_permutation]
-# Set the values in the new dataFrame to '"" where the mask is False
-p_values_correlation_abs_after_permutation_df[~mask_correlation] = ""
+        ### Keeping the p-values from the pearson correlations only if the permutation test was passed:
+        # Create a boolean mask where values in p_value_permutation_abs_df  are less than 0.05
+        mask_permutation = p_value_permutation_abs_df  < 0.05
+        mask_correlation = p_values_correlation_abs_no_NaN_df < 0.05
+        # Create a new DataFrame with the same columns and indexes as p_values_correlation_abs_no_NaN_df
+        p_values_correlation_abs_after_permutation_df = pd.DataFrame(index=p_values_correlation_abs_no_NaN_df.index,
+                                                                columns=p_values_correlation_abs_no_NaN_df.columns)
+        # Set the values in the new DataFrame to "" where the mask is False (values in p_value_permutation_abs_df  >= 0.05)
+        p_values_correlation_abs_after_permutation_df[~mask_permutation] = ""
+        # Set the values in the new DataFrame to the values in p_values_correlation_abs_no_NaN_df where the mask is True
+        p_values_correlation_abs_after_permutation_df[mask_permutation] = p_values_correlation_abs_no_NaN_df[mask_permutation]
+        # Set the values in the new dataFrame to '"" where the mask is False
+        p_values_correlation_abs_after_permutation_df[~mask_correlation] = ""
+
+
+    elif relative_or_absolute == 'relative-counts':
+        ### Relative counts
+        # Data
+        curr_df = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy() #  filtering based on " presence_threshold"
+        curr_df = curr_df.fillna(0).copy()
+        if analyzing_cluster:
+            curr_dataset_rel_df = dataset_rel_df.fillna(0).copy()
+        else:
+            curr_dataset_rel_df = curr_df.copy() 
+
+        # Columns to be compared
+        column_names = curr_df.columns.tolist()
+
+        # In case you want to run it for different subsets of the data, code need to be modify for defining column_names
+        clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+
+        # Initialize empty DataFrames to store observed correlations and p-values
+        observed_corr_rel_df = pd.DataFrame(columns=column_names, index=column_names)
+        p_value_permutation_rel_df  = pd.DataFrame(columns=column_names, index=column_names)
+
+        # Perform permutation test for each cluster and each pair of columns
+        for i, cluster_df in enumerate(clusters_list):
+            #print(f"Cluster {i + 1}:")
+            print(f"\nDoing permutation test for all pairs...\n")
+            for column_pair in combinations(column_names, 2):
+                column1_name, column2_name = column_pair
+                #print(f"Pair: {column1_name} and {column2_name}")
+                observed_corr, p_value, shuffled_corrs = permutation_test(cluster_df, curr_dataset_rel_df, column1_name, column2_name, num_permutations, _seed)
+                
+                # Save observed correlation and p-value in the corresponding DataFrames
+                observed_corr_rel_df.loc[column1_name, column2_name] = observed_corr
+                observed_corr_rel_df.loc[column2_name, column1_name] = observed_corr
+                p_value_permutation_rel_df .loc[column1_name, column2_name] = p_value
+                p_value_permutation_rel_df .loc[column2_name, column1_name] = p_value
+
+        observed_corr_rel_df = observed_corr_rel_df.apply(pd.to_numeric, errors='coerce')
+        p_value_permutation_rel_df  = p_value_permutation_rel_df .apply(pd.to_numeric, errors='coerce')
+
+
+        ### Keeping the p-values from the pearson correlations only if the permutation test was passed:
+        # Create a boolean mask where values in p_value_permutation_abs_df  are less than 0.05
+        mask_permutation = p_value_permutation_rel_df  < 0.05
+        mask_correlation = p_values_correlation_rel_no_NaN_df < 0.05
+        # Create a new DataFrame with the same columns and indexes as p_values_correlation_abs_no_NaN_df
+        p_values_correlation_rel_after_permutation_df = pd.DataFrame(index=p_values_correlation_rel_no_NaN_df.index,
+                                                                columns=p_values_correlation_rel_no_NaN_df.columns)
+        # Set the values in the new DataFrame to "" where the mask is False (values in p_value_permutation_abs_df  >= 0.05)
+        p_values_correlation_rel_after_permutation_df[~mask_permutation] = ""
+        # Set the values in the new DataFrame to the values in p_values_correlation_abs_no_NaN_df where the mask is True
+        p_values_correlation_rel_after_permutation_df[mask_permutation] = p_values_correlation_rel_no_NaN_df[mask_permutation]
+        # Set the values in the new dataFrame to '"" where the mask is False
+        p_values_correlation_rel_after_permutation_df[~mask_correlation] = ""
 
 
 
@@ -987,7 +1046,10 @@ p_values_correlation_abs_after_permutation_df[~mask_correlation] = ""
 ###############################################################################################################
 
 # Data
-_data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()
+if relative_or_absolute == 'absolute-counts':
+    _data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()
+elif relative_or_absolute == 'relative-counts':
+    _data = top_rank_popularity_rel_df[presence_threshold_sorted_column_order].copy()
 
 #Filtering out columns with no data
 #Saving the dropped indexes
@@ -1066,6 +1128,7 @@ if cluster_with_dendrogram:
     # Add the "cluster" column to the "cosine_sim_summary_df" dataframe
     cosine_sim_summary_df['cluster'] = cluster_labels
     # Print the optimal number of clusters
+    print('\nSilhouette analysis:')
     print(f"\nOptimal number of clusters from cosine similarity based on dendrogram: {optimal_n_clusters}")
 
     ## Separating cosine_sim values in clusters
@@ -2606,138 +2669,230 @@ plt.close(fig)
 # Visualization of Hieracrchical clustering
 # Heatmap of presynaptic partners' person correlation
 # Relative numbers
+if relative_or_absolute == 'relative-counts':
+    correlation_rel_no_NaN_df.replace(np.NaN,1.0, inplace = True)
+    _palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
+    if permutation_analysis:
+        g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot=p_values_correlation_rel_after_permutation_df, fmt='', annot_kws={"size":8, "color": "k"})
+        g.fig.suptitle(f'{neuron_of_interest} partners, p-values from correlations that passed permutation test, relative count(syn>={min_desired_count})') 
+        #g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot=p_value_permutation_rel_df .applymap(filter_values), fmt='', annot_kws={"size":8, "color": "k"})
+    else:
+        g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
+        g.fig.suptitle(f'{neuron_of_interest} partners, p-values from correlations, relative count(syn>={min_desired_count})') 
 
-correlation_rel_no_NaN_df.replace(np.NaN,1.0, inplace = True)
-_palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
-g = sns.clustermap(cmap = _palette, data = correlation_rel_no_NaN_df, annot = np.array(p_values_correlation_rel_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
-
-g.fig.suptitle(f'{neuron_of_interest} partners, pearson correlation matrix, hierarchical clustering, % of count(syn>={min_desired_count})') 
-g.ax_heatmap.set_xlabel('Presynaptic neuron')
-g.ax_heatmap.set_ylabel('Presynaptic neuron')
-g.fig.subplots_adjust(top=0.9)
-x0, y0, _w, _h = g.cbar_pos
-g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
-g.ax_cbar.set_title('pearson')
-
-
-#Plot saving
-if save_figures:
-    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Hierarchical-clustering-correlation-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
-    g.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
-plt.close(g.fig)
+    g.ax_heatmap.set_xlabel('Presynaptic neuron')
+    g.ax_heatmap.set_ylabel('Presynaptic neuron')
+    g.fig.subplots_adjust(top=0.9)
+    x0, y0, _w, _h = g.cbar_pos
+    g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
+    g.ax_cbar.set_title('pearson')
 
 
-correlation_abs_no_NaN_df.replace(np.NaN,1.0, inplace = True)
-_palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
-#g = sns.clustermap(cmap = _palette, data = correlation_abs_no_NaN_df, annot = np.array(p_values_correlation_abs_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
-#g = sns.clustermap(cmap = _palette, data = correlation_abs_no_NaN_df, annot=p_value_permutation_df.applymap(filter_values), fmt='', annot_kws={"size":8, "color": "k"})
-g = sns.clustermap(cmap = _palette, data = correlation_abs_no_NaN_df, annot=p_values_correlation_abs_after_permutation_df, fmt='', annot_kws={"size":8, "color": "k"})
+    #Plot saving
+    if save_figures:
+        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Hierarchical-clustering-correlation-relative-counts_{dataset_name}_{neuron_of_interest}_{relative_or_absolute}.pdf'
+        g.savefig(save_path+figure_title)
+        print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
+    plt.close(g.fig)
+
+elif relative_or_absolute == 'absolute-counts':
+    # Absolute numbers
+    correlation_abs_no_NaN_df.replace(np.NaN,1.0, inplace = True)
+    _palette = sns.color_palette("vlag", as_cmap=True) # Diverging palette
+    if permutation_analysis:
+        g = sns.clustermap(cmap = _palette, data = correlation_abs_no_NaN_df, annot=p_values_correlation_abs_after_permutation_df, fmt='', annot_kws={"size":8, "color": "k"})
+        g.fig.suptitle(f'{neuron_of_interest} partners, p-values from correlations that passed permutation test, absolute count(syn>={min_desired_count})') 
+        #g = sns.clustermap(cmap = _palette, data = correlation_abs_no_NaN_df, annot=p_value_permutation_abs_df .applymap(filter_values), fmt='', annot_kws={"size":8, "color": "k"})
+    else:
+        g = sns.clustermap(cmap = _palette, data = correlation_abs_no_NaN_df, annot = np.array(p_values_correlation_abs_no_NaN_df_asterix_df), fmt='', annot_kws={"size":16, "color": "k"})
+        g.fig.suptitle(f'{neuron_of_interest} partners, p-values from correlations, absolute count(syn>={min_desired_count})') 
 
 
-
-g.fig.suptitle(f'{neuron_of_interest} partners, p-values from correlations that passed permutation test, absolute count(syn>={min_desired_count})') 
-g.ax_heatmap.set_xlabel('Presynaptic neuron')
-g.ax_heatmap.set_ylabel('Presynaptic neuron')
-g.fig.subplots_adjust(top=0.9)
-x0, y0, _w, _h = g.cbar_pos
-g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
-g.ax_cbar.set_title('pearson')
+    g.ax_heatmap.set_xlabel('Presynaptic neuron')
+    g.ax_heatmap.set_ylabel('Presynaptic neuron')
+    g.fig.subplots_adjust(top=0.9)
+    x0, y0, _w, _h = g.cbar_pos
+    g.ax_cbar.set_position([x0+1, y0, g.ax_cbar.get_position().width/5, g.ax_cbar.get_position().width])
+    g.ax_cbar.set_title('pearson')
 
 
-#Plot saving
-if save_figures:
-    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
-    if analyzing_cluster:
-        figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}_{cluster_id}.pdf'
-    g.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
-plt.close(g.fig)
+    #Plot saving
+    if save_figures:
+        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
+        if analyzing_cluster:
+            figure_title = f'\Hierarchical-clustering-correlation-absolute-counts_{dataset_name}_{neuron_of_interest}_{cluster_id}.pdf'
+        g.savefig(save_path+figure_title)
+        print('FIGURE: Visualization of pearson correlation and hierarchical clustering plotted and saved')
+    plt.close(g.fig)
 
 ################################ PERMUTATION PLOTS FOR THE CORRELATION MATRIX ###############################
 
 if permutation_analysis:
-    #Plotting p-values <0.05 from the permutation
-    fig, axs = plt.subplots(nrows =1, ncols = 2, figsize = (40*cm, 15*cm))
+    if relative_or_absolute == 'absolute-counts':
+        ### Absolute counts
+        #Plotting p-values <0.05 from the permutation
+        fig, axs = plt.subplots(nrows =1, ncols = 2, figsize = (40*cm, 15*cm))
 
-    # Create the heatmap and annotate cells with p-values < 0.05
-    sns.heatmap(p_value_permutation_df, annot=p_value_permutation_df.applymap(filter_values), cmap='coolwarm', center=0.05, fmt='', ax = axs[0])
-    axs[0].set_title('Permutation test - p-values')
+        # Create the heatmap and annotate cells with p-values < 0.05
+        sns.heatmap(p_value_permutation_abs_df , annot=p_value_permutation_abs_df .applymap(filter_values), cmap='coolwarm', center=0.05, fmt='', ax = axs[0])
+        axs[0].set_title('Permutation test - p-values')
 
-    sns.heatmap(observed_corr_df, cmap='coolwarm', ax = axs[1])
-    axs[1].set_title('Observed correlation')
+        sns.heatmap(observed_corr_abs_df, cmap='coolwarm', ax = axs[1])
+        axs[1].set_title('Observed correlation')
 
-    if save_figures:
-        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-        figure_title = f'\Permutation-test-pvalues_{dataset_name}_{neuron_of_interest}.pdf'
-        fig.savefig(save_path+figure_title)
-        print('FIGURE: Visualization of permutation test values of pearson correlations')
-    plt.close(fig)
+        if save_figures:
+            save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+            figure_title = f'\Permutation-test-pvalues_{dataset_name}_{neuron_of_interest}_{relative_or_absolute}.pdf'
+            fig.savefig(save_path+figure_title)
+            print('FIGURE: Visualization of permutation test values of pearson correlations')
+        plt.close(fig)
+    
+    elif relative_or_absolute == 'relative-counts':
+        ### Relative counts
+        #Plotting p-values <0.05 from the permutation
+        fig, axs = plt.subplots(nrows =1, ncols = 2, figsize = (40*cm, 15*cm))
+
+        # Create the heatmap and annotate cells with p-values < 0.05
+        sns.heatmap(p_value_permutation_rel_df , annot=p_value_permutation_rel_df .applymap(filter_values), cmap='coolwarm', center=0.05, fmt='', ax = axs[0])
+        axs[0].set_title('Permutation test - p-values')
+
+        sns.heatmap(observed_corr_rel_df, cmap='coolwarm', ax = axs[1])
+        axs[1].set_title('Observed correlation')
+
+        if save_figures:
+            save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+            figure_title = f'\Permutation-test-pvalues_{dataset_name}_{neuron_of_interest}_{relative_or_absolute}.pdf'
+            fig.savefig(save_path+figure_title)
+            print('FIGURE: Visualization of permutation test values of pearson correlations')
+        plt.close(fig)
 
 ######################################### DISTRIBUTIONS FROM PERMUTATIONS ########################################
 ### Plotting all distributions  of correlations values during the permutation per each pair
 
 if permutation_analysis:
-    # Data
-    ### Absolute counts
-    curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy()
-    curr_df = curr_df.fillna(0).copy()
-    if analyzing_cluster:
-        curr_dataset_abs_df = dataset_abs_df.fillna(0).copy()
-    else:
-        curr_dataset_abs_df = curr_df.copy() 
+    if relative_or_absolute == 'absolute-counts':
+        ### Absolute counts
+        # Data
+        ### Absolute counts
+        curr_df = syn_popularity_abs_df[presence_threshold_sorted_column_order].copy()
+        curr_df = curr_df.fillna(0).copy()
+        if analyzing_cluster:
+            curr_dataset_abs_df = dataset_abs_df.fillna(0).copy()
+        else:
+            curr_dataset_abs_df = curr_df.copy() 
 
-    # Columns to be compared
-    column_names = curr_df.columns.tolist()
+        # Columns to be compared
+        column_names = curr_df.columns.tolist()
 
-    # In case you want to run it for different subsets of the data, code needs to be modified for defining column_names
-    clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+        # In case you want to run it for different subsets of the data, code needs to be modified for defining column_names
+        clusters_list = [curr_df]  # Insert your actual cluster DataFrames
 
-    # Create subplots to visualize the results
-    valid_pairs = list(combinations(column_names, 2))
+        # Create subplots to visualize the results
+        valid_pairs = list(combinations(column_names, 2))
 
-    # Define the number of subplots per figure
-    subplots_per_figure = 16
-    num_figures = int(np.ceil(len(valid_pairs) / subplots_per_figure))
+        # Define the number of subplots per figure
+        subplots_per_figure = 16
+        num_figures = int(np.ceil(len(valid_pairs) / subplots_per_figure))
 
-    # Create and save figures with subplots
-    figure_title = f'\Correlation_permutation_plots_{dataset_name}_{neuron_of_interest}_{cluster_id}.pdf'
-    outputPath =  save_path + figure_title
-    with PdfPages(outputPath) as pdf:
-        for fig_num in range(num_figures):
-            start_idx = fig_num * subplots_per_figure
-            end_idx = min((fig_num + 1) * subplots_per_figure, len(valid_pairs))
+        # Create and save figures with subplots
+        figure_title = f'\Correlation_permutation_plots_{dataset_name}_{neuron_of_interest}_{cluster_id}_{relative_or_absolute}.pdf'
+        outputPath =  save_path + figure_title
+        with PdfPages(outputPath) as pdf:
+            for fig_num in range(num_figures):
+                start_idx = fig_num * subplots_per_figure
+                end_idx = min((fig_num + 1) * subplots_per_figure, len(valid_pairs))
 
-            num_rows = num_cols = int(np.ceil(np.sqrt(end_idx - start_idx)))
-            fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
+                num_rows = num_cols = int(np.ceil(np.sqrt(end_idx - start_idx)))
+                fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
 
-            for pair_idx, (column1_name, column2_name) in enumerate(valid_pairs[start_idx:end_idx]):
-                observed_corr, p_value, shuffled_corrs = permutation_test(curr_df, curr_dataset_abs_df, column1_name, column2_name, num_permutations, _seed)
-                ax = axes[pair_idx // num_cols, pair_idx % num_cols]
+                for pair_idx, (column1_name, column2_name) in enumerate(valid_pairs[start_idx:end_idx]):
+                    observed_corr, p_value, shuffled_corrs = permutation_test(curr_df, curr_dataset_abs_df, column1_name, column2_name, num_permutations, _seed)
+                    ax = axes[pair_idx // num_cols, pair_idx % num_cols]
 
-                #In case it was not possible to get data for shuffled_corrs 
-                if np.all(np.isnan(shuffled_corrs)):
-                    ax.set_title(f"{column1_name} vs. {column2_name}")
-                    ax.text(0.1, 0.5, "Permutation test was not possible", fontsize=10, fontweight='bold')
-                else:
-                    # Plot the observed correlation and the distribution of shuffled correlations in the corresponding subplot
-                    ax.hist(shuffled_corrs, bins=30, alpha=0.6, color='gray', edgecolor='black', label='Shuffled')
-                    ax.axvline(observed_corr, color='red', linestyle='dashed', linewidth=2, label='Observed')
-                    ax.set_title(f"{column1_name} vs. {column2_name}")
-                    ax.legend()
+                    #In case it was not possible to get data for shuffled_corrs 
+                    if np.all(np.isnan(shuffled_corrs)):
+                        ax.set_title(f"{column1_name} vs. {column2_name}")
+                        ax.text(0.1, 0.5, "Permutation test was not possible", fontsize=10, fontweight='bold')
+                    else:
+                        # Plot the observed correlation and the distribution of shuffled correlations in the corresponding subplot
+                        ax.hist(shuffled_corrs, bins=30, alpha=0.6, color='gray', edgecolor='black', label='Shuffled')
+                        ax.axvline(observed_corr, color='red', linestyle='dashed', linewidth=2, label='Observed')
+                        ax.set_title(f"{column1_name} vs. {column2_name}")
+                        ax.legend()
 
-                    # Annotate the p-value in the plot
-                    ax.text(0.8, 0.85, f"P-value: {p_value:.3f}", transform=ax.transAxes, fontsize=10, fontweight='bold')
+                        # Annotate the p-value in the plot
+                        ax.text(0.8, 0.85, f"P-value: {p_value:.3f}", transform=ax.transAxes, fontsize=10, fontweight='bold')
 
-            # Hide empty subplots if any
-            for pair_idx in range(end_idx - start_idx, num_rows * num_cols):
-                axes[pair_idx // num_cols, pair_idx % num_cols].axis('off')
+                # Hide empty subplots if any
+                for pair_idx in range(end_idx - start_idx, num_rows * num_cols):
+                    axes[pair_idx // num_cols, pair_idx % num_cols].axis('off')
 
-            if save_figures:
-                pdf.savefig(fig)
-            plt.close(fig)
+                if save_figures:
+                    pdf.savefig(fig)
+                plt.close(fig)
+
+    elif relative_or_absolute == 'relative-counts':
+        ### Reletive counts
+        # Data
+        ### Absolute counts
+        curr_df = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()
+        curr_df = curr_df.fillna(0).copy()
+        if analyzing_cluster:
+            curr_dataset_rel_df = dataset_rel_df.fillna(0).copy()
+        else:
+            curr_dataset_rel_df = curr_df.copy() 
+
+        # Columns to be compared
+        column_names = curr_df.columns.tolist()
+
+        # In case you want to run it for different subsets of the data, code needs to be modified for defining column_names
+        clusters_list = [curr_df]  # Insert your actual cluster DataFrames
+
+        # Create subplots to visualize the results
+        valid_pairs = list(combinations(column_names, 2))
+
+        # Define the number of subplots per figure
+        subplots_per_figure = 16
+        num_figures = int(np.ceil(len(valid_pairs) / subplots_per_figure))
+
+        # Create and save figures with subplots
+        figure_title = f'\Correlation_permutation_plots_{dataset_name}_{neuron_of_interest}_{cluster_id}_{relative_or_absolute}.pdf'
+        outputPath =  save_path + figure_title
+        with PdfPages(outputPath) as pdf:
+            for fig_num in range(num_figures):
+                start_idx = fig_num * subplots_per_figure
+                end_idx = min((fig_num + 1) * subplots_per_figure, len(valid_pairs))
+
+                num_rows = num_cols = int(np.ceil(np.sqrt(end_idx - start_idx)))
+                fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 15))
+
+                for pair_idx, (column1_name, column2_name) in enumerate(valid_pairs[start_idx:end_idx]):
+                    observed_corr, p_value, shuffled_corrs = permutation_test(curr_df, curr_dataset_rel_df, column1_name, column2_name, num_permutations, _seed)
+                    ax = axes[pair_idx // num_cols, pair_idx % num_cols]
+
+                    #In case it was not possible to get data for shuffled_corrs 
+                    if np.all(np.isnan(shuffled_corrs)):
+                        ax.set_title(f"{column1_name} vs. {column2_name}")
+                        ax.text(0.1, 0.5, "Permutation test was not possible", fontsize=10, fontweight='bold')
+                    else:
+                        # Plot the observed correlation and the distribution of shuffled correlations in the corresponding subplot
+                        ax.hist(shuffled_corrs, bins=30, alpha=0.6, color='gray', edgecolor='black', label='Shuffled')
+                        ax.axvline(observed_corr, color='red', linestyle='dashed', linewidth=2, label='Observed')
+                        ax.set_title(f"{column1_name} vs. {column2_name}")
+                        ax.legend()
+
+                        # Annotate the p-value in the plot
+                        ax.text(0.8, 0.85, f"P-value: {p_value:.3f}", transform=ax.transAxes, fontsize=10, fontweight='bold')
+
+                # Hide empty subplots if any
+                for pair_idx in range(end_idx - start_idx, num_rows * num_cols):
+                    axes[pair_idx // num_cols, pair_idx % num_cols].axis('off')
+
+                if save_figures:
+                    pdf.savefig(fig)
+                plt.close(fig)
 
 
 ############################################# BOXPLOTS - PLOTS ##############################################
@@ -2986,6 +3141,174 @@ plt.close(fig)
 ############################################### ABSOLUT VALUES ################################################
 #Plotting Explained variability across dimensions
 
+### For relative counts
+##Plotting  the square-root eigenvalue spectrum
+fig,axs = plt.subplots(nrows =1, ncols = 1)
+axs.plot(rel_eigvals/np.sum(rel_eigvals) * 100,'-o',color='black')
+axs.set_title(f'{neuron_of_interest}, Eigenvalue spectrum, absolute counts syn>={min_desired_count}')
+axs.set_xlabel('Dimensions')
+axs.set_ylabel('Explained-variability (percentage)')
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA-explained-variability-relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA explained variability plotted and saved')
+plt.close(fig)
+
+
+##Plotting PCA1 vs PCA2
+fig, axs = plt.subplots(nrows=1, ncols=1)
+
+# Labels
+syn_df_grouped = syn_df.groupby(['instance_post', 'dorso-ventral', 'hemisphere']).agg({'W_new': sum})
+syn_df_grouped.reset_index(level=category_column, inplace=True)
+cat_list = syn_df_grouped[category_column].tolist()
+# Scatter plot
+pca_coords = (rel_data_array.T @ rel_eigvecs[:, 0], rel_data_array.T @ rel_eigvecs[:, 1])
+# Unique categories (D and V)
+# Unique categories (eg., D and V)
+unique_categories = np.unique(cat_list)
+# Define colors for the categories based on seaborn palette "Set2"
+palette = sns.color_palette(color_cat_set, len(unique_categories))
+# Scatter plot for each category
+for i, category in enumerate(unique_categories):
+    category_mask = np.array(cat_list) == category
+    x = pca_coords[0][category_mask]
+    y = pca_coords[1][category_mask]
+    axs.scatter(x, y, color=palette[i], label=category)
+# Set the title, labels, and legend
+axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2, relative-counts, syn>={min_desired_count}')
+axs.set_xlabel('PCA1')
+axs.set_ylabel('PCA2')
+axs.legend(title=category_column)
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA1-PCA2-relative-counts_{dataset_name}_{neuron_of_interest}_{category_column}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA1 vs PCA2 plotted and saved')
+plt.close(fig)
+
+
+
+## Plotting PCA1, PCA2, PCA3
+fig = plt.figure(figsize=(10, 8))
+axs = fig.add_subplot(111, projection='3d')  # Create a 3D axes object
+
+# PCA
+# Assuming you have already defined and computed rel_data_array and rel_eigvecs
+
+# Scatter plot
+pca_coords = (
+    rel_data_array.T @ rel_eigvecs[:, 0],
+    rel_data_array.T @ rel_eigvecs[:, 1],
+    rel_data_array.T @ rel_eigvecs[:, 2]  # Adding the third dimension to PCA coordinates
+)
+
+# Unique categories (eg., D and V)
+unique_categories = np.unique(cat_list)
+# Define colors for the categories based on seaborn palette "Set2"
+palette = sns.color_palette(color_cat_set, len(unique_categories))
+# Scatter plot for each category
+for i, category in enumerate(unique_categories):
+    category_mask = np.array(cat_list) == category
+    x = pca_coords[0][category_mask]
+    y = pca_coords[1][category_mask]
+    z = pca_coords[2][category_mask]
+    axs.scatter(x, y, z, color=palette[i], label=category)
+
+# Set the title, labels, and legend
+axs.set_title(f'{neuron_of_interest}, PCA1 vs PCA2 vs PCA3, relative-counts, syn>={min_desired_count}')
+axs.set_xlabel('PCA1')
+axs.set_ylabel('PCA2')
+axs.set_zlabel('PCA3')
+axs.legend(title=category_column)
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA1-PCA2-PCA3-relative-counts_{dataset_name}_{neuron_of_interest}_{category_column}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: PCA1 vs PCA2 plotted and saved')
+plt.close(fig)
+
+##Plotting contribution of neurons to PCA (Eigenvectors)
+threshold = 0.75
+fig, axs = plt.subplots(nrows=1, ncols=1)
+im = axs.imshow(rel_eigvecs, cmap='coolwarm', aspect='auto')
+
+# Get the shape of the eigenvectors array
+num_neurons, num_pcs = rel_eigvecs.shape
+
+# Loop over all elements to add text inside the plot if the absolute value is greater than the threshold
+for i in range(num_neurons):
+    for j in range(num_pcs):
+        value = rel_eigvecs[i, j]
+        if abs(value) > threshold:
+            # Add text at position (j, i) with the value rounded to 2 decimal places
+            axs.text(j, i, f'{value:.2f}', ha='center', va='center', color='black', fontsize = 8)
+
+plt.colorbar(im, ax=axs)
+axs.set_xlabel('Principal components (PCs)')
+axs.set_ylabel('Neurons')
+axs.set_yticks(np.arange(num_neurons))
+axs.set_yticklabels(rel_data.columns)
+plt.title('Contribution of neurons to PCs')
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA-contribution-from-neurons_relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Contribution of neurons to PCA plotted and saved')
+plt.close(fig)
+
+##Plotting THE RELATIVE contribution of neurons to EACH PCA (Normalized eigenvectors)
+## Normalizing the eigenvectors
+subthreshold = 0.05
+rel_eigvecs_abs = np.absolute(rel_eigvecs)
+norm_eigvecs_abs = rel_eigvecs_abs / rel_eigvecs_abs.sum(axis=0)
+fig, axs = plt.subplots(nrows=1, ncols=1)
+im = axs.imshow(norm_eigvecs_abs, cmap='Greens', aspect='auto')
+
+# Get the shape of the eigenvectors array
+num_neurons, num_pcs = norm_eigvecs_abs.shape
+
+# Add text for any value above a max_value-subthreshold:
+for i in range(num_neurons):
+    for j in range(num_pcs):
+        value = norm_eigvecs_abs[i, j]
+        max_value = np.max(norm_eigvecs_abs[:, j])
+        if abs(value) > max_value-subthreshold:
+            # Add text at position (j, i) with the value rounded to 2 decimal places
+            axs.text(j, i, f'{value:.2f}', ha='center', va='center', color=(0.5,0.5,0.5), fontsize = 8)
+
+# Add text for the maximum value per column
+for j in range(num_pcs):
+    max_value = np.max(norm_eigvecs_abs[:, j])
+    max_index = np.argmax(norm_eigvecs_abs[:, j])
+    axs.text(j, max_index, f'{max_value:.2f}', ha='center', va='center', color='black', fontsize=8)
+
+plt.colorbar(im, ax=axs)
+axs.set_xlabel('Principal components (PCs)')
+axs.set_ylabel('Neurons')
+axs.set_yticks(np.arange(num_neurons))
+axs.set_yticklabels(abs_data.columns)
+plt.title('Relative contribution of neurons to PCs')
+
+#Plot saving
+if save_figures:
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\PCA-relative-contribution-from-neurons_relative-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Contribution of neurons to PCA plotted and saved')
+plt.close(fig)
+
+
+### For absolute counts
 ##Plotting  the square-root eigenvalue spectrum
 fig,axs = plt.subplots(nrows =1, ncols = 1)
 axs.plot(abs_eigvals/np.sum(abs_eigvals) * 100,'-o',color='black')
@@ -3031,7 +3354,7 @@ axs.legend(title=category_column)
 #Plot saving
 if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\PCA1-PCA2-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\PCA1-PCA2-absolute-counts_{dataset_name}_{neuron_of_interest}_{category_column}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: PCA1 vs PCA2 plotted and saved')
 plt.close(fig)
@@ -3074,7 +3397,7 @@ axs.legend(title=category_column)
 #Plot saving
 if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\PCA1-PCA2-PCA3-absolute-counts_{dataset_name}_{neuron_of_interest}.pdf'
+    figure_title = f'\PCA1-PCA2-PCA3-absolute-counts_{dataset_name}_{neuron_of_interest}_{category_column}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: PCA1 vs PCA2 plotted and saved')
 plt.close(fig)
@@ -3656,24 +3979,24 @@ if instance_count_plot:
 #     plt.show()
 
 
-# #Option 2: ( for correlation matrices)
-# Initialize an empty DataFrame to store the correlation matrix
-correlation_abs_no_NaN_df = pd.DataFrame(columns=curr_df.columns, index=curr_df.columns)
-p_values_correlation_abs_no_NaN_df = pd.DataFrame(columns=curr_df.columns, index=curr_df.columns)
+# # #Option 2: ( for correlation matrices)
+# # Initialize an empty DataFrame to store the correlation matrix
+# correlation_abs_no_NaN_df = pd.DataFrame(columns=curr_df.columns, index=curr_df.columns)
+# p_values_correlation_abs_no_NaN_df = pd.DataFrame(columns=curr_df.columns, index=curr_df.columns)
 
-# Calculate the correlation matrix using Pearson correlation
-for col1, col2 in combinations(curr_df.columns, 2):
-    # Get the data for the current pair of columns
-    x_data, y_data = curr_df[col1], curr_df[col2]
+# # Calculate the correlation matrix using Pearson correlation
+# for col1, col2 in combinations(curr_df.columns, 2):
+#     # Get the data for the current pair of columns
+#     x_data, y_data = curr_df[col1], curr_df[col2]
     
-    # Compute the Pearson correlation coefficient and p-value
-    correlation_coefficient, p_value = pearsonr(x_data, y_data)
+#     # Compute the Pearson correlation coefficient and p-value
+#     correlation_coefficient, p_value = pearsonr(x_data, y_data)
     
-    # Store the absolute value of the correlation coefficient in the DataFrame
-    correlation_abs_no_NaN_df.at[col1, col2] = correlation_coefficient
-    correlation_abs_no_NaN_df.at[col2, col1] = correlation_coefficient
-    p_values_correlation_abs_no_NaN_df.at[col1, col2] = p_value
-    p_values_correlation_abs_no_NaN_df.at[col2, col1] = p_value
+#     # Store the absolute value of the correlation coefficient in the DataFrame
+#     correlation_abs_no_NaN_df.at[col1, col2] = correlation_coefficient
+#     correlation_abs_no_NaN_df.at[col2, col1] = correlation_coefficient
+#     p_values_correlation_abs_no_NaN_df.at[col1, col2] = p_value
+#     p_values_correlation_abs_no_NaN_df.at[col2, col1] = p_value
 
-# Fill the diagonal with 1.0 since the correlation of a feature with itself is always 1
-np.fill_diagonal(correlation_abs_no_NaN_df.values, 1.0)
+# # Fill the diagonal with 1.0 since the correlation of a feature with itself is always 1
+# np.fill_diagonal(correlation_abs_no_NaN_df.values, 1.0)
