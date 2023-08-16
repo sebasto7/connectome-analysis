@@ -178,7 +178,7 @@ sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_co
 relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts' 
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
-category_column = 'hemisphere'# 'dorso-ventral', 'hemisphere'
+category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
 #Colors
 color_cat_set = "Set1" # select a set for a seaborn color palette
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
@@ -226,18 +226,19 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'L'  # 'L', 'R', 'L_R'
+optic_lobe = 'R'  # 'L', 'R', 'L_R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
-mesh_ME = 'ME_R' # 'ME_R' , 'ME_L' 
-mesh_LO = 'LO_R' # 'LO_R' , 'LO_L'
-mesh_azim = -18# -18 for ME_R, 16 for ME_L
-mesh_elev = -148 # -148 for ME_R, -50 for ME_L
+mesh_ME = 'ME_L' # 'ME_R' , 'ME_L' 
+mesh_LO = 'LO_L' # 'LO_R' , 'LO_L'
+mesh_azim = 16# -18 for ME_R, 16 for ME_L
+mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 # Cluster information
 analyzing_cluster = False
 cluster_id = 'C1'
+save_clusters_txt = True
 
 #Path and file
 PC_disc = 'C'
@@ -1110,7 +1111,7 @@ cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered, index=_data_reorder
 if cluster_with_dendrogram:
 
     # Range of clusters to consider
-    range_n_clusters = range(4, 10)
+    range_n_clusters = range(10, 20) # prevously used: range(4, 10)
     # List to store silhouette scores
     silhouette_scores = []
     # Calculate silhouette scores for different numbers of clusters
@@ -1127,6 +1128,34 @@ if cluster_with_dendrogram:
     cluster_labels = clusterer.fit_predict(cosine_sim)
     # Add the "cluster" column to the "cosine_sim_summary_df" dataframe
     cosine_sim_summary_df['cluster'] = cluster_labels
+
+    # Extract lists of indexes names (postsynaptic colums IDs) for the differe clusters
+
+    clusters_optic_lobe_ids = {}  # Dictionary to store clusters and their corresponding index names
+
+    for index, row in cosine_sim_summary_df.iterrows():
+        index_parts = index.split(':')
+        row_cluster_id = row['cluster']
+        if row_cluster_id not in clusters_optic_lobe_ids:
+            clusters_optic_lobe_ids[row_cluster_id] = []
+        clusters_optic_lobe_ids[row_cluster_id].append(index_parts[2])
+
+    # Convert the dictionary values to sets to remove duplicates, then back to lists
+    for row_cluster_id in clusters_optic_lobe_ids:
+        clusters_optic_lobe_ids[row_cluster_id] = list(set(clusters_optic_lobe_ids[row_cluster_id]))
+
+    # Print the result
+    for row_cluster_id, index_names in clusters_optic_lobe_ids.items():
+        print(f'Cluster {row_cluster_id}: {index_names}')
+
+    # Save cluster lists as text files
+    if save_clusters_txt: 
+        for row_cluster_id, index_names in clusters_optic_lobe_ids.items():
+            file_name = f"\Tm9_cosine_similarity_cluster_{row_cluster_id}_{optic_lobe}.txt"
+            df_cluster = pd.DataFrame(index_names, columns=['Index Name'])
+            df_cluster.to_csv(txtPath+file_name, sep='\t', index=False, header=False)
+
+
     # Print the optimal number of clusters
     print('\nSilhouette analysis:')
     print(f"\nOptimal number of clusters from cosine similarity based on dendrogram: {optimal_n_clusters}")
@@ -2554,7 +2583,7 @@ cbar.set_label('Cosine Similarity')
 #Plot saving
 if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-    figure_title = f'\Cosine-similarity_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
+    figure_title = f'\Cosine-similarity_{dataset_name}_{neuron_of_interest}_{relative_or_absolute}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of cosine similarity, clustered')
 plt.close(fig)
