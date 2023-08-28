@@ -21,6 +21,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics.pairwise import cosine_similarity
 from scipy.cluster import hierarchy
+from scipy.spatial.distance import cdist
 import matplotlib.gridspec as gridspec
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.ticker import MultipleLocator
@@ -150,6 +151,54 @@ def calculate_correlation_and_p_values(df):
 
     return correlation_df, p_values_correlation_df
 
+
+def cosine_similarity_and_clustering(_data):
+    import numpy as np
+    import pandas as pd
+    from sklearn.metrics.pairwise import cosine_similarity
+    from scipy.cluster import hierarchy
+    # Filtering out columns with no data
+    dropped_indexes = []
+    kept_indexes = []
+    dropped_data = _data.dropna(how='all', inplace=False)
+    dropped_indexes.extend(list(set(_data.index) - set(dropped_data.index)))
+    kept_indexes.extend(dropped_data.index)
+    print(f'Dropping {len(dropped_indexes)} Tm9 columns with no data during cosine_sim analysis')
+
+    _data.dropna(how='all', inplace=True)  # now dropping if all values in the row are nan
+    _data.fillna(0, inplace=True)  # Filling the remaining absent connectivity with a meaningful zero
+
+    # Calculate cosine similarity
+    cosine_sim = cosine_similarity(_data.values)
+    cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
+
+
+    hemisphere_list = [index_name.split(':')[2][0] for index_name in _data.index]
+    d_v_list = [index_name.split(':')[3] for index_name in _data.index]
+    cell_type_list = [index_name.split(':')[0] for index_name in _data.index]
+
+    cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere','neuron'],
+                                         index=_data.index.tolist())
+    cosine_sim_nan = np.where(cosine_sim == 1., np.nan, cosine_sim)
+    cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2)
+    cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
+    cosine_sim_summary_df['hemisphere'] = hemisphere_list
+    cosine_sim_summary_df['dorso-ventral'] = d_v_list
+    cosine_sim_summary_df['neuron'] = cell_type_list
+
+
+    dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
+    cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
+
+    _data_reordered_cosine_sim = _data.iloc[cosine_row_order].copy()
+
+    cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim.values)
+    cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered,
+                                          index=_data_reordered_cosine_sim.index,
+                                          columns=_data_reordered_cosine_sim.index)
+
+    return cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered
+
 #%% 
 ############################################# PLOTS GENERAL SETTINGS ##########################################
 ###############################################################################################################
@@ -173,7 +222,6 @@ cm = 1/2.54  # centimeters in inches
 
 #Sorting options for plots
 sort_by = 'median_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%'
-
 #Choosing type of data for cosine similarity and cluster analysis
 relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts' 
 
@@ -181,8 +229,8 @@ relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts'
 category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
 #Colors
 color_cat_set = "Set1" # select a set for a seaborn color palette
-hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3'
-neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3'
+hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3', Tm2: 'light:#a6761d'
+neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3', Tm2: '#a6761d'
 #YES-NO options
 save_figures = True
 exclude_outliers = True # Plot variability without outliers
@@ -214,7 +262,7 @@ d_v_filter = False #
 selection_area = '' # 'D', 'V'
 
 #Analysis of heterogeneous partners only:
-discard_homogeneous = True   # To analyse all partnes, make it False
+discard_homogeneous = False   # To analyse all partnes, make it False
 thr_homogenous = 0.9 # Threshold about which a partner is defined as homogenous (e.g present in 90% or 75% of the columns)
 
 #Clustering options
@@ -226,14 +274,22 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'R'  # 'L', 'R', 'L_R'
+optic_lobe = 'L'  # 'L', 'R', 'L_R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
-mesh_ME = 'ME_L' # 'ME_R' , 'ME_L' 
-mesh_LO = 'LO_L' # 'LO_R' , 'LO_L'
-mesh_azim = 16# -18 for ME_R, 16 for ME_L
-mesh_elev = -50 # -148 for ME_R, -50 for ME_L
+mesh_ME = 'ME_R' # 'ME_R' , 'ME_L' 
+mesh_LO = 'LO_R' # 'LO_R' , 'LO_L'
+mesh_azim = -18# -18 for ME_R, 16 for ME_L
+mesh_elev = -148 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
+
+##
+mesh_OL_L = 'ME_R'
+mesh_OL_R = 'ME_L'
+mesh_azim_L = -18# -18 for ME_R, 16 for ME_L
+mesh_elev_L = -148 # -148 for ME_R, -50 for ME_L
+mesh_azim_R = 16# -18 for ME_R, 16 for ME_L
+mesh_elev_R = -50 # -148 for ME_R, -50 for ME_L
 
 # Cluster information
 analyzing_cluster = False
@@ -243,8 +299,9 @@ save_clusters_txt = True
 #Path and file
 PC_disc = 'C'
 dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets'#r'C:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230718'
+fileDate = '20230823'
 fileName = f'{neuron_of_interest}_neurons_input_count_{optic_lobe}_{fileDate}.xlsx'
+#fileName = f'Tm9_neurons_input_count_L_R_OA_subtypes_20230718.xlsx' # Remove this line after OA plots are done
 fileName_database = f'{neuron_of_interest} proofreadings_{fileDate}.xlsx'
 fileName_NT = 'NT_identity_optic_lobe_neurons.xlsx'
 
@@ -255,7 +312,8 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_healthy_L3_{optic_lobe}.txt' # 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_D_patch_L.txt' # 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+
 
 # Healthy columns based on lamina detachement and damage L3s
 keep_only_healthy_columns = False # Only good if your data subselection does not considere it already (not being used)
@@ -1052,52 +1110,7 @@ if relative_or_absolute == 'absolute-counts':
 elif relative_or_absolute == 'relative-counts':
     _data = top_rank_popularity_rel_df[presence_threshold_sorted_column_order].copy()
 
-#Filtering out columns with no data
-#Saving the dropped indexes
-dropped_indexes = []
-kept_indexes = []
-dropped_data = _data.dropna(how='all', inplace=False)
-dropped_indexes.extend(list(set(_data.index) - set(dropped_data.index)))
-kept_indexes.extend(dropped_data.index)
-print(f'Dropping {len(dropped_indexes)} Tm9 columns with no data during cosine_sim analysis')
-
-_data.dropna(how='all', inplace = True)    #now dropping if all values in the row are nan
-
-#Filling the remaining absent connectvity with a meaninfull zero
-_data.fillna(0, inplace=True)
-
-# Calculate cosine similarity
-cosine_sim = cosine_similarity(_data.values)
-# Convert the cosine_sim 2D array to a DataFrame
-cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
-
-#Create a dataframe for later usage
-#Data we need
-syn_df_grouped = syn_df.groupby(['instance_post','dorso-ventral','hemisphere']).agg({'W_new': sum}).loc[kept_indexes]
-syn_df_grouped.reset_index(level='dorso-ventral', inplace= True)
-syn_df_grouped.reset_index(level='hemisphere', inplace= True)
-d_v_list = syn_df_grouped['dorso-ventral'].tolist()
-hemisphere_list = syn_df_grouped['hemisphere'].tolist()
-
-#Initializing the data frame
-cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere'], 
-                  index = _data.index.tolist())
-#Filling in the data frame
-cosine_sim_nan = np.where(cosine_sim== 1., np.nan, cosine_sim)
-cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan,1),2)
-cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
-cosine_sim_summary_df['hemisphere'] = hemisphere_list
-cosine_sim_summary_df['dorso-ventral'] = d_v_list
-
-# Perform hierarchical clustering
-dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
-cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
-# Create a new DataFrame with reordered rows and columns
-_data_reordered_cosine_sim = _data.iloc[cosine_row_order].copy()
-# Calculate cosine similarity
-cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim .values)
-# Convert the cosine_sim 2D array to a DataFrame
-cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered, index=_data_reordered_cosine_sim.index, columns=_data_reordered_cosine_sim.index)
+cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered = cosine_similarity_and_clustering(_data)
 
 
 ###################################### DENDROGRAM CLUSTERING ######################################
@@ -1111,7 +1124,7 @@ cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered, index=_data_reorder
 if cluster_with_dendrogram:
 
     # Range of clusters to consider
-    range_n_clusters = range(10, 20) # prevously used: range(4, 10)
+    range_n_clusters = range(8, 10) # prevously used: range(4, 10)
     # List to store silhouette scores
     silhouette_scores = []
     # Calculate silhouette scores for different numbers of clusters
@@ -1260,6 +1273,44 @@ abs_eigvecs = np.real(abs_eigvecs)
 k = np.argsort(abs_eigvals)[::-1]
 abs_eigvals = abs_eigvals[k]
 abs_eigvecs = abs_eigvecs[:,k]
+
+
+######################################## SPATIAL DISTRIBUTION ANALYSIS #######################################
+####################################### Nearest neighbour distribution #######################################
+
+# Nearest neighbour distance distribution of presynaptic partner connection to Tm9s
+_data = binary_df[presence_threshold_sorted_column_order] # FIlter abnd sorting
+pre_partner_list = _data.columns.tolist()
+
+#Extracting the XYZ locations of postsynpatic neurons of a given presynaptic partner
+for pre_partner in pre_partner_list:
+    curr_df = df[(df['type_pre'] == pre_partner) & (df['W_new'] >= 3) ].copy()
+    curr_post_neurons_IDs = curr_df['optic_lobe_id'].unique().tolist()
+    ##Gettting the center point in specific neuropile from database
+    xyz_neuropil = 'XYZ-ME'
+    xyz_df = database_df[database_df['optic_lobe_id'].isin(curr_post_neurons_IDs)].copy()
+    xyz_pre = xyz_df[xyz_neuropil].tolist()
+    # Split each string by comma and convert the elements to floats
+    xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
+    xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
+    xyz_pre_arr_new = xyz_pre_arr_new /1000 # Changing nanometers to micrometers
+
+    ##Calculating the Nearest neighbour ditances per each point
+    # Calculate pairwise distances
+    data =  xyz_pre_arr_new
+    distances = cdist(data, data)
+    # Set diagonal elements to a high value (as each point is its own nearest neighbor)
+    np.fill_diagonal(distances, np.inf)
+    # Find the minimum distance for each point
+    nearest_distances = np.min(distances, axis=1)
+    print(f'{pre_partner}: {len(nearest_distances)} data points')
+    
+    # # Plotting the distributions
+    # plt.hist(nearest_distances, bins=40, edgecolor='black')
+    # plt.xlabel('Nearest Neighbor Distance (um)')
+    # plt.ylabel('Frequency')
+    # plt.title(f'Distribution of Nearest Neighbor Distances for {pre_partner}')
+    # plt.show()
 
 
 #%%
@@ -3528,24 +3579,26 @@ xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
 
 # #Seb commented out since we plot all neurons in the next step anyways
-#Getting list for dot sizes and colors based on instance counts of a pre_partner
-#pre_partner = 'Tm16'
-#Dot sizes
+# #Getting list for dot sizes and colors based on instance counts of a pre_partner
+# pre_partner = 'OA-AL2b2-R1'
+# #Dot sizes
 # dot_sizes = _data[pre_partner].fillna(0).tolist()
-# dot_sizes_ME = [size*10 for size in dot_sizes]  # Increase size by a factor of 20
+# dot_sizes_ME = [size*5 for size in dot_sizes]  # Increase size by a factor of 20
 # dot_sizes_LO = [size*5 for size in dot_sizes]  # Increase size by a factor of 10
-# OL_R = flywire.get_neuropil_volumes([mesh_ME]) #['ME_R','LO_R','LOP_R']
-# fig = plt.figure()
+# OL_R = flywire.get_neuropil_volumes([mesh_OL_L]) #['ME_R','LO_R','LOP_R']
+# fig = plt.figure(figsize=20,10)
 # ax = fig.add_subplot(111, projection='3d')
 # ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_ME,c=neuron_color)  # Adjust the size (s) as desired
+# ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=1,c='k',alpha=1) # All dots
 # navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um')
-# ax.azim = mesh_azim 
-# ax.elev = mesh_elev 
+# ax.azim = mesh_azim_L 
+# ax.elev = mesh_elev_L
+# ax.set_title(f"Presynaptic partner: {pre_partner}, {mesh_OL_L}", fontsize = 8)
 
 # #Plot saving
 # if save_figures:
 #     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-#     figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{pre_partner}_{neuron_of_interest}.pdf'
+#     figure_title = f'\Meshes_XYZ_positions_ME_binary_{dataset_name}_{mesh_OL_L}_{pre_partner}_{neuron_of_interest}.pdf'
 #     fig.savefig(save_path+figure_title)
 #     print('FIGURE: Visualization of XYZ positions plotted and saved')
 # plt.close(fig)
@@ -3696,9 +3749,154 @@ xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
 xyz_pre_arr_new = xyz_pre_arr * np.array([4,4,40])
 
 
+# Plotting all neurons in the same pdf page
+# Data
+_data = counting_instances_df.T[presence_threshold_sorted_column_order] # FIlter abnd sorting
+
+# Assuming pre_partner_list is a list of objects to be plotted
+pre_partner_list = _data.columns.tolist()
+OL_R = flywire.get_neuropil_volumes([mesh_ME])
+
+# Create a PDF file to save the plots
+save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' # Your path
+figure_title = f'\Meshes_XYZ_positions_ME_instance_counts_all_partners_{dataset_name}_{neuron_of_interest}.pdf'
+outputPath =  save_path + figure_title
+pdf_pages = PdfPages(outputPath)
+
+# Calculate the number of rows and columns for the grid layout
+num_plots = len(pre_partner_list)
+num_cols = 4  # Adjust the number of columns as needed
+num_rows = (num_plots - 1) // num_cols + 1
+
+# Set the figure size based on DIN4 page size
+fig_width = 8.27 *2  # Width of DIN4 page in inches
+fig_height = 11.69  *2 # Height of DIN4 page in inches
+
+# Calculate the size of each subplot
+subplot_width = fig_width / num_cols * 4  # Adjust the multiplier as needed
+subplot_height = fig_height / num_rows * 4  # Adjust the multiplier as needed
+
+# Calculate the size of the plotted content
+content_width = subplot_width * 0.9  # Adjust the multiplier as needed
+content_height = subplot_height * 0.9  # Adjust the multiplier as needed
+
+# Create the figure and subplot grid
+fig, axes = plt.subplots(num_rows, num_cols, figsize=(fig_width, fig_height), subplot_kw={'projection': '3d'})
+
+# Set the size of the plotted content in each subplot
+for ax in axes.flatten():
+    ax.set_box_aspect([content_width, content_height, content_height])
+
+# Flatten the axes array if it's a 1D array
+if num_plots == 1:
+    axes = [axes]
+
+# Loop through the objects and create subplots
+for i, (pre_partner, ax) in enumerate(zip(pre_partner_list, axes.flatten())):
+    # Generate the plot for the current object
+    dot_sizes = _data[pre_partner].fillna(0).tolist()
+    dot_sizes_ME = [size * 5 for size in dot_sizes]  # Increase size by a factor of X
+
+    size_color_map = {}
+    color_palette = sns.color_palette(color_palette_name, int(max(counting_instances_df.max()))) # before:  sns.color_palette(color_palette_name, len(set(dot_sizes))) 
+
+    #Dot colors
+    dot_colors = []
+
+    
+    for size in dot_sizes:
+        if size != 0.0 and size not in size_color_map:
+            size_color_map[size] = color_palette[len(size_color_map)] #TODO Think how to improve this line to fix the colors!
+        #dot_colors.append(size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0))
+        color = size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0)
+        color = (*color[:3], 1.0)  # Make color fully opaque
+        dot_colors.append(color)
+
+    # Plot the object
+    ax.scatter(
+        xyz_pre_arr_new[:, 0],
+        xyz_pre_arr_new[:, 1],
+        xyz_pre_arr_new[:, 2],
+        s=dot_sizes_ME,
+        c=dot_colors,
+        alpha=0.9
+    )
+    ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=1,c='k',alpha=1) # All dots
+    navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um') #
+
+    # Rotating the view
+    ax.azim = mesh_azim 
+    ax.elev = mesh_elev 
+
+    # Set plot title
+    ax.set_title(f"Presynaptic partner: {pre_partner}", fontsize = 8)
+
+    # Remove ticks and tick labels from XYZ axes
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_zticks([])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+
+    # Remove the spines (axis lines)
+    ax.spines['left'].set_visible(False)
+
+    # Remove axes lines
+    ax.w_xaxis.line.set_color((0.0, 0.0, 0.0, 0.0))
+    ax.w_yaxis.line.set_color((0.0, 0.0, 0.0, 0.0))
+    ax.w_zaxis.line.set_color((0.0, 0.0, 0.0, 0.0))
+    ax.w_xaxis.line.set_linewidth(0.0)
+    ax.w_yaxis.line.set_linewidth(0.0)
+    ax.w_zaxis.line.set_linewidth(0.0)
+
+    # Remove background
+    ax.w_xaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_yaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+    ax.w_zaxis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+
+    # Hide axis lines and tick markers
+    ax.w_xaxis.line.set_color("none")
+    ax.w_yaxis.line.set_color("none")
+    ax.w_zaxis.line.set_color("none")
+    ax.set_axis_off()
+
+    # Remove grid lines
+    ax.grid(False)
+
+    # Remove the axis marker
+    ax._axis3don = False
+
+    ax.axis('off')
+
+    # Add any additional customization to the plot
+
+# Remove empty subplots
+for i in range(num_plots, num_rows * num_cols):
+    fig.delaxes(axes.flatten()[i])
+
+# Adjust the spacing between subplots
+fig.subplots_adjust(wspace=0, hspace=0)
+fig.tight_layout(pad=0)
+
+# Adjust the spacing between subplots and between the title and the plot
+fig.subplots_adjust(wspace=0, hspace=0, top=0.85)
+
+# Save the figure with subplots to the PDF file
+pdf_pages.savefig(fig, bbox_inches='tight', pad_inches=0)
+
+# Close the figure and PDF file
+plt.close(fig)
+pdf_pages.close()
+
+print(f"Plots saved in {outputPath}")
+
+
+
+
 if instance_count_plot:
     #Getting list for dot sizes and colors based on instance counts of a pre_partner
-    pre_partner = 'Tm16'
+    pre_partner = 'Dm12'
 
     #Dot sizes
     dot_sizes = counting_instances_df.T[pre_partner].fillna(0).tolist()
@@ -3706,14 +3904,15 @@ if instance_count_plot:
     dot_sizes_LO = [size*10 for size in dot_sizes]  # Increase size by a factor of 10
 
     size_color_map = {}
-    color_palette = sns.color_palette(color_palette_name, len(set(dot_sizes)))
+    color_palette = sns.color_palette(color_palette_name, int(max(counting_instances_df.max()))) # before:  sns.color_palette(color_palette_name, len(set(dot_sizes))) 
 
     #Dot colors
     dot_colors = []
 
+    
     for size in dot_sizes:
         if size != 0.0 and size not in size_color_map:
-            size_color_map[size] = color_palette[len(size_color_map)]
+            size_color_map[size] = color_palette[len(size_color_map)] #TODO Think how to improve this line to fix the colors!
         #dot_colors.append(size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0))
         color = size_color_map.get(size, (1.0, 1.0, 1.0)) if size != 0.0 else (1.0, 1.0, 1.0)
         color = (*color[:3], 1.0)  # Make color fully opaque
