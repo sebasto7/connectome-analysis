@@ -152,7 +152,7 @@ def calculate_correlation_and_p_values(df):
     return correlation_df, p_values_correlation_df
 
 
-def cosine_similarity_and_clustering(_data):
+def cosine_similarity_and_clustering(_data,cosine_subgroups):
     import numpy as np
     import pandas as pd
     from sklearn.metrics.pairwise import cosine_similarity
@@ -164,8 +164,29 @@ def cosine_similarity_and_clustering(_data):
     dropped_indexes.extend(list(set(_data.index) - set(dropped_data.index)))
     kept_indexes.extend(dropped_data.index)
     print(f'Dropping {len(dropped_indexes)} Tm9 columns with no data during cosine_sim analysis')
-
     _data.dropna(how='all', inplace=True)  # now dropping if all values in the row are nan
+
+    #Doing cosine similarities in subgroups in the data set
+    # Separate data into subgroups based on subgroup letters in the index
+    subgroup_data = {}
+    for subgroup in cosine_subgroups:
+        subgroup_data[subgroup] = _data[_data.index.str.contains(subgroup)]
+
+    # Calculate cosine similarity within each subgroup
+    cos_sim_within = {}
+    cos_sim_within_medians = {}
+    for subgroup, subgroup_df in subgroup_data.items():
+        cos_sim_within[subgroup] = cosine_similarity(subgroup_df.fillna(0))
+        cos_sim_within_medians[subgroup] = list(np.round(np.nanmedian(cos_sim_within[subgroup], 1), 2)) # pulling values together for each postsynaptic neuron
+
+    # Calculate cosine similarity between subgroups if needed
+    cos_sim_between = cosine_similarity(subgroup_data[cosine_subgroups[0]].fillna(0), subgroup_data[cosine_subgroups[1]].fillna(0))
+    cos_sim_between_medians = list(np.round(np.nanmedian(cos_sim_between, 1), 2)) # pulling values together for each postsynaptic neuron
+
+    # Within and between together in a dictionary
+    cos_sim_medians = cos_sim_within_medians
+    cos_sim_medians[''.join(cosine_subgroups)] = cos_sim_between_medians
+
     _data.fillna(0, inplace=True)  # Filling the remaining absent connectivity with a meaningful zero
 
     # Calculate cosine similarity
@@ -180,7 +201,7 @@ def cosine_similarity_and_clustering(_data):
     cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere','neuron'],
                                          index=_data.index.tolist())
     cosine_sim_nan = np.where(cosine_sim == 1., np.nan, cosine_sim)
-    cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2)
+    cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2) # pulling values together for each postsynaptic neuron
     cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
     cosine_sim_summary_df['hemisphere'] = hemisphere_list
     cosine_sim_summary_df['dorso-ventral'] = d_v_list
@@ -197,7 +218,7 @@ def cosine_similarity_and_clustering(_data):
                                           index=_data_reordered_cosine_sim.index,
                                           columns=_data_reordered_cosine_sim.index)
 
-    return cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered
+    return cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered, cos_sim_medians
 
 #%% 
 ############################################# PLOTS GENERAL SETTINGS ##########################################
@@ -227,6 +248,8 @@ relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts'
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
 category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
+cosine_subgroups = ['D', 'V'] # ['D', 'V'], ['R', 'L']
+
 #Colors
 color_cat_set = "Set1" # select a set for a seaborn color palette
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3', Tm2: 'light:#a6761d'
@@ -274,12 +297,12 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'L'  # 'L', 'R', 'L_R'
+optic_lobe = 'L_R'  # 'L', 'R', 'L_R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
-mesh_ME = 'ME_R' # 'ME_R' , 'ME_L' 
-mesh_LO = 'LO_R' # 'LO_R' , 'LO_L'
-mesh_azim = -18# -18 for ME_R, 16 for ME_L
-mesh_elev = -148 # -148 for ME_R, -50 for ME_L
+mesh_ME = 'ME_L' # 'ME_R' , 'ME_L' 
+mesh_LO = 'LO_L' # 'LO_R' , 'LO_L'
+mesh_azim = 16# -18 for ME_R, 16 for ME_L
+mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
@@ -312,7 +335,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_D_patch_L.txt' # 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_healthy_L3_{optic_lobe}.txt' # 'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 
 # Healthy columns based on lamina detachement and damage L3s
@@ -324,7 +347,7 @@ ExM_dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\expansion-microsco
 
 
 #Processed data saving path
-saving_processed_data = False
+saving_processed_data = True
 output_dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'#r'C:\Connectomics-Data\FlyWire\Processed-data'
 
 
@@ -423,8 +446,8 @@ if keep_only_healthy_columns:
 #Subselection filter:
 if subselection_filter:
     df = df[df['optic_lobe_id'].isin(subselection_id_columns)].copy()
-if d_v_filter:
-    df = df[df['dorso-ventral'] == selection_area].copy()
+    if d_v_filter:
+        df = df[df['dorso-ventral'] == selection_area].copy()
 
 # Keeping a dataframe without any synaptic ot N.I filter
 df_0 = df.copy()
@@ -1110,7 +1133,7 @@ if relative_or_absolute == 'absolute-counts':
 elif relative_or_absolute == 'relative-counts':
     _data = top_rank_popularity_rel_df[presence_threshold_sorted_column_order].copy()
 
-cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered = cosine_similarity_and_clustering(_data)
+cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered, cos_sim_medians = cosine_similarity_and_clustering(_data,cosine_subgroups)
 
 
 ###################################### DENDROGRAM CLUSTERING ######################################
@@ -1303,7 +1326,7 @@ for pre_partner in pre_partner_list:
     np.fill_diagonal(distances, np.inf)
     # Find the minimum distance for each point
     nearest_distances = np.min(distances, axis=1)
-    print(f'{pre_partner}: {len(nearest_distances)} data points')
+    #print(f'{pre_partner}: {len(nearest_distances)} data points')
     
     # # Plotting the distributions
     # plt.hist(nearest_distances, bins=40, edgecolor='black')
@@ -1349,8 +1372,8 @@ if discard_homogeneous:
     column_medians = excluded_partners_df.median(axis=0)
     column_stds = excluded_partners_df.std(axis=0)
     column_sems = column_stds / np.sqrt(excluded_partners_df.shape[0])
-    print(f'Excluded partners: {excluded_partners} ') 
-    print(f"Relative synaptic number being excluded: {round(column_means['sum'],2)}+-{round(column_stds['sum'], 2)} or {round(column_sems['sum'], 2)} (mean+-std or sem)")
+    print(f'For this excluded partners: {excluded_partners} ') 
+    print(f"Input coverage in relative (%) synaptic number being excluded: {round(column_means['sum'],2)}+-{round(column_stds['sum'], 2)} or {round(column_sems['sum'], 2)} (mean+-std or sem)")
 
     ## For absolute counts
     # Calculate the sum, mean, std, and SEM for each row
@@ -1373,7 +1396,7 @@ if discard_homogeneous:
     # excluded_partners_df = excluded_partners_df.append(column_stds, ignore_index=True)
     # # Assign row labels for clarity
     # excluded_partners_df.index = excluded_partners_df.index.to_list()[:-2] + ['mean', 'std']
-    print(f"Absolute synaptic number being excluded: {round(column_means['sum'],2)}+-{round(column_stds['sum'], 2)} or {round(column_sems['sum'], 2)} (mean+-std or sem)")  
+    print(f"Input coverage in absolute synaptic number being excluded: {round(column_means['sum'],2)}+-{round(column_stds['sum'], 2)} or {round(column_sems['sum'], 2)} (mean+-std or sem)")  
 
 
 #%%
