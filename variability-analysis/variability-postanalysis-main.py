@@ -21,76 +21,14 @@ from scikit_posthocs import posthoc_dunn
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+
+#Importing custom functions from helper file
+from helper import cosine_similarity_and_clustering
+
 #%% Custom functions 
 #TODO load this functions from a helper file at some point
 
-def cosine_similarity_and_clustering(_data,cosine_subgroups):
-    import numpy as np
-    import pandas as pd
-    from sklearn.metrics.pairwise import cosine_similarity
-    from scipy.cluster import hierarchy
-    # Filtering out columns with no data
-    dropped_indexes = []
-    kept_indexes = []
-    dropped_data = _data.dropna(how='all', inplace=False)
-    dropped_indexes.extend(list(set(_data.index) - set(dropped_data.index)))
-    kept_indexes.extend(dropped_data.index)
-    print(f'Dropping {len(dropped_indexes)} Tm9 columns with no data during cosine_sim analysis')
-    _data.dropna(how='all', inplace=True)  # now dropping if all values in the row are nan
 
-    #Doing cosine similarities in subgroups in the data set
-    # Separate data into subgroups based on subgroup letters in the index
-    subgroup_data = {}
-    for subgroup in cosine_subgroups:
-        subgroup_data[subgroup] = _data[_data.index.str.contains(subgroup)]
-
-    # Calculate cosine similarity within each subgroup
-    cos_sim_within = {}
-    cos_sim_within_medians = {}
-    for subgroup, subgroup_df in subgroup_data.items():
-        cos_sim_within[subgroup] = cosine_similarity(subgroup_df.fillna(0))
-        cos_sim_within_medians[subgroup] = list(np.round(np.nanmedian(cos_sim_within[subgroup], 1), 2)) # pulling values together for each postsynaptic neuron
-
-    # Calculate cosine similarity between subgroups if needed
-    cos_sim_between = cosine_similarity(subgroup_data[cosine_subgroups[0]].fillna(0), subgroup_data[cosine_subgroups[1]].fillna(0))
-    cos_sim_between_medians = list(np.round(np.nanmedian(cos_sim_between, 1), 2)) # pulling values together for each postsynaptic neuron
-
-    # Within and between together in a dictionary
-    cos_sim_medians = cos_sim_within_medians
-    cos_sim_medians[''.join(cosine_subgroups)] = cos_sim_between_medians
-
-    _data.fillna(0, inplace=True)  # Filling the remaining absent connectivity with a meaningful zero
-
-    # Calculate cosine similarity
-    cosine_sim = cosine_similarity(_data.values)
-    cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
-
-
-    hemisphere_list = [index_name.split(':')[2][0] for index_name in _data.index]
-    d_v_list = [index_name.split(':')[3] for index_name in _data.index]
-    cell_type_list = [index_name.split(':')[0] for index_name in _data.index]
-
-    cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere','neuron'],
-                                         index=_data.index.tolist())
-    cosine_sim_nan = np.where(cosine_sim == 1., np.nan, cosine_sim)
-    cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2) # pulling values together for each postsynaptic neuron
-    cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
-    cosine_sim_summary_df['hemisphere'] = hemisphere_list
-    cosine_sim_summary_df['dorso-ventral'] = d_v_list
-    cosine_sim_summary_df['neuron'] = cell_type_list
-
-
-    dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
-    cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
-
-    _data_reordered_cosine_sim = _data.iloc[cosine_row_order].copy()
-
-    cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim.values)
-    cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered,
-                                          index=_data_reordered_cosine_sim.index,
-                                          columns=_data_reordered_cosine_sim.index)
-
-    return cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered, cos_sim_medians
 
 
 #%% 
