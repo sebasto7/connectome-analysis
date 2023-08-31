@@ -75,7 +75,7 @@ color_cat_set = "Set1" # select a set for a seaborn color palette
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3', Tm2: 'light:#a6761d'
 neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3', Tm2: '#a6761d'
 #YES-NO options
-save_figures = True
+save_figures = False
 exclude_outliers = True # Plot variability without outliers
 stacked_plots = False 
 
@@ -1101,9 +1101,12 @@ curr_abs_stats_no_ouliers_df['mean'] = curr_abs_stats_no_ouliers_df.mean(axis=1)
 ######################################### DIMENTIONALITY Reduction #######################################
 ################################################   PCA   #################################################
 #TODO check the code, something is wrong. PCA values are not centeres in 0
+order = ['L3','Mi4','CT1','Tm16','Dm12','Tm20','C3','Tm1','PS125','L4','ML1','TmY17','C2','OA-AL2b2','Tm2','Mi13','putative-fru-N.I.','Tm5c','Me-Lo-2-N.I.','TmY15']
+
 #For relative counts:
 # Data
 rel_data = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()
+rel_data = syn_popularity_rel_df[order].copy()
 rel_data= rel_data.fillna(0)
 rel_data_array = rel_data.to_numpy(dtype=int,copy=True)
 
@@ -1113,7 +1116,7 @@ rel_data_array = rel_data.to_numpy(dtype=int,copy=True)
 rel_data_array_norm = rel_data_array-rel_data_array.mean(axis=0) #Standardize the features (row axis). We want mean across columns
 # Calculate standard deviation, handling potential division by zero or NaN
 std_dev = rel_data_array_norm.std(axis=0)
-std_dev[np.isnan(std_dev) | (std_dev == 0)] = 1.0
+#std_dev[np.isnan(std_dev) | (std_dev == 0)] = 1.0
 # Divide by standard deviation, handling potential division by zero or NaN
 rel_data_array_norm /= std_dev
 n = rel_data_array_norm.shape[0]
@@ -1136,7 +1139,7 @@ abs_data_array = abs_data.to_numpy(dtype=int,copy=True)
 abs_data_array_norm = abs_data_array-rel_data_array.mean(axis=0) #Standardize the features (row axis). We want mean across columns
 # Calculate standard deviation, handling potential division by zero or NaN
 std_dev = abs_data_array_norm.std(axis=0)
-std_dev[np.isnan(std_dev) | (std_dev == 0)] = 1.0
+#std_dev[np.isnan(std_dev) | (std_dev == 0)] = 1.0
 # Divide by standard deviation, handling potential division by zero or NaN
 abs_data_array_norm /= std_dev
 n = abs_data_array_norm.shape[0]
