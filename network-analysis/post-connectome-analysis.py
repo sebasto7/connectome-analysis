@@ -17,15 +17,19 @@ from core_functions_network_analysis import path_length_transformation_plot, gra
 from core_functions_network_analysis import  input_output_plot,direct_indirect_connections_plot, connections_histomgram_plot,centrality_plot
 
 
-
 #%% Users parameters
-main_data_folder = r'E:\Connectomics-Data'
+PC_disc = 'D'
+main_data_folder =  f'{PC_disc}:\Connectomics-Data'
 graph = 'Fib25_data_7medulla_columns'
 pkl_file_list = ['Home-column.pickle','A-column.pickle','B-column.pickle','C-column.pickle', 'D-column.pickle', 'E-column.pickle', 'F-column.pickle' ] # Fill in
 short_col_names = ['Ho','A','B','C', 'D', 'E', 'F' ] # Fill in
 
 pkl_file_list = ['home.pickle','-C.pickle','-D.pickle','-E.pickle'] # Fill in
 short_col_names = ['Ho','C','D','E'] # Fill in
+
+# graph = 'NeuPrint_data_7medulla_columns'
+# pkl_file_list = ['home column.pickle','C column.pickle','D column.pickle','E column.pickle'] # Fill in
+
 
 
 #%% Auto creation of important paths
@@ -92,7 +96,7 @@ for files in range(i): #Looping across files
     temp_final_output_df = data['final_output_df']
     temp_final_input_ranked_df = data['final_input_ranked_df']
     temp_final_output_ranked_df = data['final_output_ranked_df']
-    temp_centrality_df = data['centrality_microcircuit_df']
+    temp_centrality_df = data['centrality_microcircuit_df'] #centrality_df. #TODO: create a separate line for centrality_df / centrality_microcircuit_df
     temp_path_df = data['path_df']
     temp_path_df['Path'] = temp_path_df['Path'].agg(lambda x: ','.join(map(str, x)))
     temp_partners_df = pd.DataFrame(data['number_partners_dict'])
@@ -145,12 +149,17 @@ _ci=68 # confidence interval of 68 is ~1 standard error
 # Add at least 4 neurons, names must be written as in the data set!
 list_of_neurons = ['Tm1','Tm2','Tm4', 'Tm9', 'Mi1','Tm3','Mi4', 'Mi9'] # 
 list_of_neurons = ['L1','L3','L5','Mi1','Tm3','CT1','C3', 'C2', 'Mi4', 'Mi9','T4a','T4b','T4c','T4d']# 
+list_of_neurons = ['L1','L3','L5','Mi1','Tm3','CT1','C3', 'C2', 'Mi4', 'Mi9']# 
 fig_heatmap, fig_heatmap_max, fig_heatmap_sum = heatmap_plot(short_col_names,all_columns_final_input_df,list_of_neurons,user_parameters,'Input')
 
-#Quick save to visualize:
-fig_heatmap.savefig(main_data_folder +'\heatmap.pdf')
-fig_heatmap_max.savefig(main_data_folder +'\heatmap_max.pdf')
-fig_heatmap_sum.savefig(main_data_folder +'\heatmap_sum.pdf')
+if save_figures:
+    #Quick save to visualize:
+    fig_heatmap.savefig(main_data_folder +'\heatmap.pdf')
+    fig_heatmap_max.savefig(main_data_folder +'\heatmap_max.pdf')
+    fig_heatmap_sum.savefig(main_data_folder +'\heatmap_sum.pdf')
+    plt.close(fig_heatmap)
+    plt.close(fig_heatmap_max)
+    plt.close(fig_heatmap_sum)
 
 ###############################################################################
 #TODO Move this to an funtion or make the function direct_indirect_connections_plot more flexible to plot this as well
@@ -295,6 +304,9 @@ bar_axes_c[1,1].spines['top'].set_visible(False)
 _title = 'All columns ,' + graph + ': ' + ' centrality measures'
 bar_fig_c.suptitle(_title, fontsize = 12)
 plt.show()
+
+#Quick save to visualize:
+bar_fig_c.savefig(main_data_folder +'\centrality_all_columns_noT4s.pdf')
 
 ############################ Pathplot with seaborn ##########################
 
