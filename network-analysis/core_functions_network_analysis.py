@@ -1071,10 +1071,11 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
                 # print(f"Neuron: {neuron}")
                 # print(f"Number of columns in _data: {_data.shape[1]}")
                 sns.heatmap(cmap=_palette,ax = axes[i,j],data = _data) 
-                axes[i,j].tick_params(axis='x', labelrotation=90, labelsize=4)
+                axes[i,j].tick_params(axis='x', labelrotation=90, labelsize=6)
                 axes[i,j].set_xlabel(f'{data_name} neuron')
                 axes[i,j].set_ylabel(f'Columns')
                 axes[i,j].set_yticklabels(short_col_names)
+                axes[i,j].set_xticks(range(0,len(_data.columns.tolist())))
                 axes[i,j].set_xticklabels(_data.columns.tolist())
                 axes[i,j].set_title(f'{neuron}')
 
@@ -1098,11 +1099,14 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
                 break
             else:
                 neuron = list_of_neurons[n]
-                sns.heatmap(cmap=_palette,ax = axes_max[i,j],data = df_max.loc[neuron].dropna(axis='columns', how ='all')) # we drop columns if they only have NaN values
-                axes_max[i,j].tick_params(axis='x', labelrotation=90, labelsize=4)
+                _data = df_max.loc[neuron].dropna(axis='columns', how ='all') # we drop columns if they only have NaN values
+                sns.heatmap(cmap=_palette,ax = axes_max[i,j],data = _data)
+                axes_max[i,j].tick_params(axis='x', labelrotation=90, labelsize=6)
                 axes_max[i,j].set_xlabel(f'{data_name} neuron')
                 axes_max[i,j].set_ylabel(f'Columns')
                 axes_max[i,j].set_yticklabels(short_col_names)
+                axes_max[i,j].set_xticks(range(0,len(_data.columns.tolist())))
+                axes_max[i,j].set_xticklabels(_data.columns.tolist())
                 axes_max[i,j].set_title(f'{neuron}')
 
             n += 1
@@ -1125,11 +1129,14 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
                 break
             else:
                 neuron = list_of_neurons[n]
-                sns.heatmap(cmap=_palette,ax = axes_sum[i,j],data = df_sum.loc[neuron].dropna(axis='columns', how ='all')) # we drop columns if they only have NaN values
+                _data = df_sum.loc[neuron].dropna(axis='columns', how ='all')  # we drop columns if they only have NaN values
+                sns.heatmap(cmap=_palette,ax = axes_sum[i,j],data = _data)
                 axes_sum[i,j].tick_params(axis='x', labelrotation=90, labelsize=4)
                 axes_sum[i,j].set_xlabel(f'{data_name} neuron')
                 axes_sum[i,j].set_ylabel(f'Columns')
                 axes_sum[i,j].set_yticklabels(short_col_names)
+                axes_sum[i,j].set_xticks(range(0,len(_data.columns.tolist())))
+                axes_sum[i,j].set_xticklabels(_data.columns.tolist())
                 axes_sum[i,j].set_title(f'{neuron}')
 
             n += 1
