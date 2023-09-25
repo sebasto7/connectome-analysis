@@ -82,7 +82,6 @@ def graph_creation(Table, user_parameters,microcircuit):
         neurons = user_parameters['defined_microcirtuit'] 
         Table = Table[(Table['PreSynapticNeuron'].isin(neurons)) & (Table['PostSynapticNeuron'].isin(neurons))].copy()
     else:
-
         neurons = list(np.unique(np.concatenate((presynaptic_neurons,postsynaptic_neurons), axis = 0)))
     for i,n in enumerate(neurons):
         if n[-4:] == 'home':
@@ -102,7 +101,6 @@ def graph_creation(Table, user_parameters,microcircuit):
         neuron_list = neurons_list_aggregated
     else:
         neuron_list = neurons
-    user_parameters['neuron_list'] = neuron_list
         
     for n,neuron in enumerate(neuron_list):
             customGraph.addNode(neuron)
@@ -139,6 +137,10 @@ def graph_creation(Table, user_parameters,microcircuit):
         edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
     elif user_parameters['edge_length_tranformation_function'] == "linear_flip_function":
         edges = [(k[0], k[1], {'weight': (-v+int(max(Table['N']))+1)}) for k, v in Weights.items()] 
+    elif user_parameters['edge_length_tranformation_function']  == "binary":
+        edges = [(k[0], k[1], {'weight': 1}) for k, v in Weights.items()] 
+    elif user_parameters['edge_length_tranformation_function'] == "none":
+        edges = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()]
 
     G = nx.DiGraph() 
     G.add_edges_from(edges)
@@ -254,6 +256,7 @@ def path_length_transformation_plot(Table, user_parameters, transformation_funct
 
 
     print("Line plots for path length transformation done.")
+    plt.close()
     return fig
 
 
@@ -283,6 +286,7 @@ def connections_histomgram_plot(Table,user_parameters):
 
     _title = f"Number of connections, {user_parameters['graph']} : {user_parameters['column']}"
     fig.suptitle(_title, fontsize = 12)
+    plt.close()
 
     return fig
 
@@ -296,7 +300,8 @@ def graph_plot(Weights, user_parameters, transformation_function):
     -linear_flip_function: The following function is applied to flip values linearly, new_data = (data*-1) + max(data) + 1, 
         where data is a collection of values from 1 to a given maximum. An old maximun X becomes 1 and the 1 becomes the new maximum X.
         The linearity of all values in between is maintained
-    - none
+    -binary: All connections (edges) between neurons (nodes) will be equal to 1
+    -none
 
     '''
 
@@ -307,6 +312,9 @@ def graph_plot(Weights, user_parameters, transformation_function):
         edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
     elif transformation_function  == "linear_flip_function":
         edges = [(k[0], k[1], {'weight': (-v+int(max(Weights.values()))+1)}) for k, v in Weights.items()] 
+    elif transformation_function  == "binary":
+        edges = [(k[0], k[1], {'weight': 1}) for k, v in Weights.items()] 
+
     elif transformation_function == "none":
         edges = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()]
 
@@ -369,9 +377,12 @@ def graph_plot(Weights, user_parameters, transformation_function):
             labels [key]= round(1/value)
         elif transformation_function  == "linear_flip_function":
             labels [key]= (-value+int(max(Weights.values()))+1)
+        elif transformation_function  == "binary":
+            labels [key]= value
         else:
             break
     #nx.draw_networkx_edge_labels(G,pos,edge_labels=labels,label_pos = 0.35,font_size=5)
+    plt.close()
 
     return fig
 
@@ -450,8 +461,7 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
                 path_fig.suptitle('Node-to-node path. Averaged weigth: %.1f  %s ' % (weigth_path,user_parameters['graph']))
                 nx.draw_networkx_labels(G,pos)
                 plt.axis('equal')
-                plt.show()
-                plt.close()
+
             
                 if save_figures:
                     name_nodes = user_parameters['start_node'] +' to ' + user_parameters['last_node']
@@ -474,6 +484,7 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
     path_df['Jumps'] = list(map(lambda x: len(x)-1, path_df['Path'])) # Number of jumps between nodes based on path length        
     
     print(f'Node to node path analysis done. Total number of paths: {len(path_df)}')
+    plt.close()
     return path_df
 
 
@@ -505,6 +516,7 @@ def distribution_path_length_plot(path_df, user_parameters,save_figures):
     axes[1].spines['right'].set_visible(False)
     axes[1].spines['top'].set_visible(False)
 
+    plt.close()
     return fig
 
 
@@ -514,38 +526,47 @@ def centrality_analysis(G,user_parameters):
     '''
     
     '''
+    from networkx.algorithms.centrality import degree_centrality
+    from networkx.algorithms.centrality import in_degree_centrality
+    from networkx.algorithms.centrality import out_degree_centrality
     from networkx.algorithms.centrality import closeness_centrality
     from networkx.algorithms.centrality import betweenness_centrality
-    from networkx.algorithms.centrality import degree_centrality
     from networkx.algorithms.centrality import eigenvector_centrality
 
     # with NetwrokX
     degree_dict = degree_centrality(G)
+    in_degree_dict = in_degree_centrality(G)
+    out_degree_dict = out_degree_centrality(G)
     eigenvector_dict = eigenvector_centrality(G)
     pagerank_dict = nx.pagerank(G, alpha = 0.8)
     betweenness_dict = betweenness_centrality(G, k=None, normalized=True, weight="weight") # Use distances as weight?
     closeness_dict = closeness_centrality(G, u=None, distance="weight", wf_improved=True) # Inputs distances?
 
-    degree_df =pd.DataFrame(degree_dict, index=[0]) 
+    degree_df =pd.DataFrame(degree_dict, index=[0])
+    in_degree_df =pd.DataFrame(in_degree_dict, index=[0])
+    out_degree_df =pd.DataFrame(out_degree_dict, index=[0]) 
     eigenvector_df =pd.DataFrame(eigenvector_dict, index=[0])
     pagerank_df =pd.DataFrame(pagerank_dict, index=[0])  
     betweenness_df =pd.DataFrame(betweenness_dict, index=[0]) 
     closeness_df =pd.DataFrame(closeness_dict, index=[0]) 
 
     degree_df = degree_df.T
+    in_degree_df = in_degree_df.T
+    out_degree_df = out_degree_df.T
     eigenvector_df = eigenvector_df.T
     pagerank_df = pagerank_df.T
     betweenness_df = betweenness_df.T
     closeness_df = closeness_df.T
 
-    centrality_df = pd.concat([degree_df , eigenvector_df, pagerank_df,betweenness_df,closeness_df ], axis=1)
-    centrality_df.columns = ['Degree', 'Eigenvector', 'Pagerank eigenvector', 'Betweenness', 'Closeness']
+    centrality_df = pd.concat([degree_df, in_degree_df, out_degree_df , eigenvector_df, pagerank_df,betweenness_df,closeness_df ], axis=1)
+    centrality_df.columns = ['Degree','IN-Degree','OUT-Degree', 'Eigenvector', 'Pagerank eigenvector', 'Betweenness', 'Closeness']
     centrality_df.reset_index(level=0, inplace=True)
     centrality_df.rename(columns = {'index':'Neuron'}, inplace = True)
 
     centrality_df = centrality_df[centrality_df.Neuron.isin(user_parameters['neurons_to_exclude']) == False]
 
     print('Centrality measures analysis done.')
+    plt.close()
     return centrality_df
 
 def direct_indirect_connections_analysis(Weights,user_parameters):
@@ -592,6 +613,7 @@ def direct_indirect_connections_analysis(Weights,user_parameters):
         norm_length_dict[neuron] = temp_total_norm_length_list
 
     print('Direct and indirect connections analysis done.')
+    plt.close()
     return number_partners_dict, length_dict, norm_length_dict
     
 def input_output_analysis(Weights,user_parameters):
@@ -860,6 +882,11 @@ def input_output_plot(node_of_interest,final_input_output_dict,final_input_df,fi
 
     _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ': ' + user_parameters['node_of_interest'] +' FRACTIONS'
     fig_l.suptitle(_title, fontsize = 12)
+    plt.close()
+    plt.close()
+    plt.close()
+    plt.close()
+    plt.close()
 
     return fig, fig_s, fig_r, fig_f, fig_l
         
@@ -978,6 +1005,8 @@ def direct_indirect_connections_plot(number_partners_dict,length_dict,norm_lengt
 
     _title = user_parameters['graph'] + ': ' + user_parameters['column']
     fig_s.suptitle(_title, fontsize = 12)
+    plt.close()
+    plt.close()
 
     return fig, fig_s
 
@@ -1029,9 +1058,8 @@ def centrality_plot(centrality_df,user_parameters):#
 
     _title = user_parameters['graph'] + ': ' + user_parameters['column'] + ' Centrality measures'
     fig.suptitle(_title, fontsize = 12)
+    plt.close()
 
-    #plt.show()
-    #plt.close()
     return fig
 
 def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
@@ -1140,6 +1168,8 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
                 axes_sum[i,j].set_title(f'{neuron}')
 
             n += 1
-
+    plt.close()
+    plt.close()
+    plt.close()        
     return fig, fig_max, fig_sum
 

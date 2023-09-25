@@ -76,7 +76,7 @@ def main_analysis(user_parameters):
 
         #print(results.head())
 
-        # Fetchin connectivity among all nuerons in the data set
+        ## Fetchin connectivity among all nuerons in the data set
         neuron_ids = results['bodyId'].tolist()
         
         # All upstream and dowsntream connections of a set of neurons # AKA INPUTS AND OUTPUTS
@@ -86,7 +86,7 @@ def main_analysis(user_parameters):
         Table = Table[Table['N'] >user_parameters['synaptic_stength_filter']].copy()
         #print(conn_df.head())
 
-        #Juan + Chatgpt code:
+        #Juan + Chatgpt code option to fetch connectivity (currently not being used):
         list_of_instances=['-C']
         neuron_df=fetch_neurons(NC(inputRois=['distal','proximal']))[0] 
         neuron_df = neuron_df.replace(to_replace='None', value=np.nan).dropna().copy()
@@ -101,11 +101,23 @@ def main_analysis(user_parameters):
 
     #%% Some filtering
     Table = Table[(Table['PreSynapticNeuron'] != user_parameters['exclude_node']) & (Table['PostSynapticNeuron'] != user_parameters['exclude_node'])]
+
+    # All neurons present in the data base:
+    presynaptic_neurons = Table.PreSynapticNeuron.unique()
+    postsynaptic_neurons = Table.PostSynapticNeuron.unique()
+    user_parameters['neuron_list'] = list(np.unique(np.concatenate((presynaptic_neurons,postsynaptic_neurons), axis = 0)))
+
+
+
+
     #%% Auto creation of important paths
-    dirPath = os.path.join(user_parameters['mainFolder'], user_parameters['column'], user_parameters['graph'])
+    dirPath = os.path.join(user_parameters['mainFolder'],'all-data',user_parameters['graph'], user_parameters['column']) #  
     if not os.path.exists(dirPath):
         os.makedirs(dirPath)
-    main_processed_data_folder = os.path.join(user_parameters['mainFolder'],'processed-data',user_parameters['graph'])
+    main_processed_data_folder = os.path.join(user_parameters['mainFolder'],'processed-data',user_parameters['graph']) # 
+    if not os.path.exists(main_processed_data_folder):
+        os.makedirs(main_processed_data_folder)
+    
 
 
     #%% Data visualization 
@@ -194,23 +206,23 @@ def main_analysis(user_parameters):
         save_dir = dirPath +'\\figures\\'
         if not os.path.exists(save_dir):
             os.mkdir(save_dir) # Seb: creating figures folder     
-        fig_graph_original_length_transformed.savefig(save_dir+'Graph %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
+        fig_graph_original_length_transformed.savefig(save_dir+'Graph %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
         fig_graph_original_length_transformed_microcircuit.savefig(save_dir+'Graph microcircuit %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
     
-        fig_stacked_connections.savefig(save_dir+'Stacked bar plot %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-        fig_direct_indirect_connections.savefig(save_dir+'Bar plots %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-        fig_centrality.savefig(save_dir+'Centrality measures %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-        fig_centrality_microcircuit.savefig(save_dir+'Centrality measures microcircuit %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        fig_stacked_connections.savefig(save_dir+'Stacked bar plot %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        fig_direct_indirect_connections.savefig(save_dir+'Bar plots %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        fig_centrality.savefig(save_dir+'Centrality measures %s_%s_%s.pdf' % (user_parameters['column'],user_parameters['graph'],user_parameters['edge_length_tranformation_function']),bbox_inches = "tight")
+        fig_centrality_microcircuit.savefig(save_dir+'Centrality measures microcircuit %s_%s_%s.pdf' % (user_parameters['column'],user_parameters['graph'],user_parameters['edge_length_tranformation_function']),bbox_inches = "tight")
 
-        input_output_fig.savefig(save_dir+'Inputs and outputs - %s %s %s .pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-        input_output_fractions_fig.savefig(save_dir+'Inputs and outputs - FRACTION  %s %s .pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
-        input_output_line_fig.savefig(save_dir+'Inputs and outputs FRACTION - %s %s %s .pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        input_output_fig.savefig(save_dir+'Inputs and outputs - %s_%s_%s.pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        input_output_fractions_fig.savefig(save_dir+'Inputs and outputs - FRACTION  %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        input_output_line_fig.savefig(save_dir+'Inputs and outputs FRACTION - %s_%s_%s.pdf' % (user_parameters['node_of_interest'], user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
         print('\nFigures saved.\n')
         
     if user_parameters['save_data']:
         os.chdir(user_parameters['mainFolder']) # Seb: X_save_vars.txt file needs to be there    
         varDict = locals()
-        pckl_save_name = ('%s' % user_parameters['column'])
+        pckl_save_name = '%s_%s' % (user_parameters['column'],user_parameters['edge_length_tranformation_function'])
         saveOutputDir = dirPath+ '\\processed-data\\' 
         if not os.path.exists(saveOutputDir): # Seb: creating processed data folder
             os.mkdir(saveOutputDir) 
