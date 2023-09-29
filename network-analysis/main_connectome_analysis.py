@@ -74,6 +74,30 @@ def main_analysis(user_parameters):
         column_id = user_parameters['column']
         results = c.fetch_custom(q.format(column_id))
 
+
+
+        if user_parameters['add_neurons']:
+        
+            # Construct a regular expression pattern that matches the desired format
+            prefix_pattern = '|'.join(user_parameters['neurons_prefixes'])
+            suffix_pattern = '|'.join(user_parameters['neurons_sufix'])
+            regex_pattern = f'^({prefix_pattern}).*({suffix_pattern})$'
+
+            # Construct the Cypher query with the regex pattern embedded
+            q = f"""
+                MATCH (n: Neuron)
+                WHERE n.instance =~ '{regex_pattern}'
+                RETURN n.bodyId AS bodyId, n.type AS type, n.instance AS instance, n.pre AS numpre, n.post AS numpost
+                ORDER BY n.pre + n.post DESC
+            """
+
+            # Use the fetch_custom method to execute the query
+            add_results = c.fetch_custom(q)
+            results = results.append(add_results)
+
+
+
+
         #print(results.head())
 
         ## Fetchin connectivity among all nuerons in the data set
@@ -87,17 +111,17 @@ def main_analysis(user_parameters):
         #print(conn_df.head())
 
         #Juan + Chatgpt code option to fetch connectivity (currently not being used):
-        list_of_instances=['-C']
-        neuron_df=fetch_neurons(NC(inputRois=['distal','proximal']))[0] 
-        neuron_df = neuron_df.replace(to_replace='None', value=np.nan).dropna().copy()
-        #neuron_df = neuron_df[neuron_df['instance'].str.contains(user_parameters['column'])].copy()
-        neuron_df = neuron_df[neuron_df['instance'].str.contains('|'.join(list_of_instances))].copy()
+        # list_of_instances=['-C']
+        # neuron_df=fetch_neurons(NC(inputRois=['distal','proximal']))[0] 
+        # neuron_df = neuron_df.replace(to_replace='None', value=np.nan).dropna().copy()
+        # #neuron_df = neuron_df[neuron_df['instance'].str.contains(user_parameters['column'])].copy()
+        # neuron_df = neuron_df[neuron_df['instance'].str.contains('|'.join(list_of_instances))].copy()
 
-        #Quick sanity check for the presence of some neuron types
-        check = 'Tm3'
-        test_list =  Table['PostSynapticNeuron'].tolist() #neuron_df['instance'].unique().tolist()
-        res = [idx for idx in test_list if idx.startswith(check)]
-        #print(res)
+        # #Quick sanity check for the presence of some neuron types
+        # check = 'Tm3'
+        # test_list =  Table['PostSynapticNeuron'].tolist() #neuron_df['instance'].unique().tolist()
+        # res = [idx for idx in test_list if idx.startswith(check)]
+        # #print(res)
 
     #%% Some filtering
     Table = Table[(Table['PreSynapticNeuron'] != user_parameters['exclude_node']) & (Table['PostSynapticNeuron'] != user_parameters['exclude_node'])]
@@ -106,6 +130,11 @@ def main_analysis(user_parameters):
     presynaptic_neurons = Table.PreSynapticNeuron.unique()
     postsynaptic_neurons = Table.PostSynapticNeuron.unique()
     user_parameters['neuron_list'] = list(np.unique(np.concatenate((presynaptic_neurons,postsynaptic_neurons), axis = 0)))
+
+    # All neurons present in the data base:
+    presynaptic_neuron_instances = Table.instance_pre.unique()
+    postsynaptic_neuron_instances = Table.instance_post.unique()
+    user_parameters['neuron_instance_list'] = list(np.unique(np.concatenate((presynaptic_neuron_instances,postsynaptic_neuron_instances), axis = 0)))
 
 
 
@@ -132,10 +161,14 @@ def main_analysis(user_parameters):
     #%% Graph creation
 
     G,customGraph = graph_creation(Table, user_parameters,microcircuit=False)
+    G_instances,customGraph_instances = graph_creation(Table, user_parameters,microcircuit=False, by_instance = True)
     G_microcircuit,customGraph_microcircuit = graph_creation(Table, user_parameters,microcircuit=True)
+    G_microcircuit_instance,customGraph_microcircuit_instances = graph_creation(Table, user_parameters,microcircuit=True, by_instance = True)
     
     #%% Visualizing the graph
     fig_graph_original_length = graph_plot(customGraph.distances, user_parameters, 'none')
+    fig_graph_original_length_microcircuit = graph_plot(customGraph_microcircuit.distances, user_parameters, 'none')
+    fig_graph_original_length_microcircuit_instance = graph_plot(customGraph_microcircuit_instances.distances, user_parameters, 'none')
     fig_graph_original_length_transformed = graph_plot(customGraph.distances, user_parameters, user_parameters['edge_length_tranformation_function'])
     fig_graph_original_length_transformed_microcircuit = graph_plot(customGraph_microcircuit.distances, user_parameters, user_parameters['edge_length_tranformation_function'])
 
@@ -190,7 +223,10 @@ def main_analysis(user_parameters):
     fig_direct_indirect_connections, fig_stacked_connections = direct_indirect_connections_plot(number_partners_dict,length_dict,norm_length_dict,user_parameters)
 
     #%% Input- ouput analysis
-    final_input_output_dict, final_input_df,final_output_df, final_input_ranked_df ,final_output_ranked_df,final_input_ranked_norm_df,final_output_ranked_norm_df = input_output_analysis(customGraph.distances,user_parameters)
+    final_input_output_dict, final_input_df,final_output_df, final_input_ranked_df ,final_output_ranked_df,final_input_ranked_norm_df,final_output_ranked_norm_df = input_output_analysis(customGraph.distances,user_parameters['neuron_list'])
+    final_input_output_instances_dict, final_input_instances_df,final_output_instances_df, final_input_ranked_instances_df ,final_output_ranked_instances_df,final_input_ranked_norm_instances_df,final_output_ranked_norm_instances_df = input_output_analysis(customGraph_instances.distances,user_parameters['neuron_instance_list'])
+
+
 
     #Input - outputs plots for a node_of_interest
     node_of_interest = user_parameters['node_of_interest']
@@ -205,9 +241,12 @@ def main_analysis(user_parameters):
             os.mkdir(dirPath)
         save_dir = dirPath +'\\figures\\'
         if not os.path.exists(save_dir):
-            os.mkdir(save_dir) # Seb: creating figures folder     
-        fig_graph_original_length_transformed.savefig(save_dir+'Graph %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
-        fig_graph_original_length_transformed_microcircuit.savefig(save_dir+'Graph microcircuit %s %s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")        
+            os.mkdir(save_dir) # Seb: creating figures folder 
+        fig_graph_original_length.savefig(save_dir+'Graph_min-max-norm_%s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight") 
+        fig_graph_original_length_microcircuit.savefig(save_dir+'Graph_min-max-norm_microcircuit%s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
+        fig_graph_original_length_microcircuit_instance.savefig(save_dir+'Graph_min-max-norm_microcircuit%s_%s_by_instances.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")         
+        fig_graph_original_length_transformed.savefig(save_dir+'Graph_transformed %s_%s_%s.pdf' % (user_parameters['column'],user_parameters['graph'],user_parameters['edge_length_tranformation_function']),bbox_inches = "tight")        
+        fig_graph_original_length_transformed_microcircuit.savefig(save_dir+'Graph_transformed-microcircuit_%s_%s_%s.pdf' % (user_parameters['column'],user_parameters['graph'],user_parameters['edge_length_tranformation_function']),bbox_inches = "tight")        
     
         fig_stacked_connections.savefig(save_dir+'Stacked bar plot %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")
         fig_direct_indirect_connections.savefig(save_dir+'Bar plots %s_%s.pdf' % (user_parameters['column'],user_parameters['graph']),bbox_inches = "tight")

@@ -72,11 +72,24 @@ def dijkstra(graph, initial):
     
     return visited, path
 
-def graph_creation(Table, user_parameters,microcircuit):
+def graph_creation(Table, user_parameters,microcircuit,by_instance = False):
+
+    
+    if by_instance:
+        _pre_neuron_naming = 'instance_pre'
+        _post_neuron_naming = 'instance_post'
+
+    else:
+        _pre_neuron_naming = 'PreSynapticNeuron'
+        _post_neuron_naming = 'PostSynapticNeuron'
+
 
     # Creating list of nodes
-    presynaptic_neurons = Table.PreSynapticNeuron.unique()
-    postsynaptic_neurons = Table.PostSynapticNeuron.unique()
+    presynaptic_neurons = Table[_pre_neuron_naming].unique()
+    postsynaptic_neurons = Table[_post_neuron_naming].unique()
+
+    print(f'\nGraph created with: \n Presynaptic neurons: {presynaptic_neurons} \n Postsynaptic neurons: {postsynaptic_neurons}\n')
+
 
     if microcircuit:
         neurons = user_parameters['defined_microcirtuit'] 
@@ -109,15 +122,17 @@ def graph_creation(Table, user_parameters,microcircuit):
     for index, row in Table.iterrows():
         # access data using column names
         if user_parameters['aggregate']:
-            pair = row['PreSynapticNeuron'][0:user_parameters['aggregate_ii']],row['PostSynapticNeuron'][0:user_parameters['aggregate_ii']]
+            pair = row[_pre_neuron_naming][0:user_parameters['aggregate_ii']],row[_post_neuron_naming][0:user_parameters['aggregate_ii']]
         else:
-            if row['PreSynapticNeuron'][-4:] == 'home':
-                _pre = row['PreSynapticNeuron'][0:-4]
-                _post = row['PostSynapticNeuron'][0:-4]
-            else:
-                _pre = row['PreSynapticNeuron']
-                _post = row['PostSynapticNeuron']
-
+            # Conmmeted out temporarely, seb 20230927
+            # if row[_pre_neuron_naming][-4:] == 'home':
+            #     _pre = row[_pre_neuron_naming][0:-4]
+            #     _post = row[_post_neuron_naming][0:-4]
+            # else:
+            #     _pre = row[_pre_neuron_naming]
+            #     _post = row[_post_neuron_naming]
+            _pre = row[_pre_neuron_naming]
+            _post = row[_post_neuron_naming]
             pair = _pre ,_post 
             
         if pair in customGraph.distances:
@@ -308,15 +323,61 @@ def graph_plot(Weights, user_parameters, transformation_function):
     concentricGraph = False # To generate a graph based on layers
 
 
-    if transformation_function  == 'reciprocal_function':
-        edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
-    elif transformation_function  == "linear_flip_function":
-        edges = [(k[0], k[1], {'weight': (-v+int(max(Weights.values()))+1)}) for k, v in Weights.items()] 
-    elif transformation_function  == "binary":
-        edges = [(k[0], k[1], {'weight': 1}) for k, v in Weights.items()] 
+    # Determine the min and max edge values for normalization
+    min_weight = min(Weights.values())
+    max_weight = max(Weights.values())
 
+    if min_weight == max_weight:
+        # Avoid division by zero when all edge weights are the same
+        min_weight = 0
+
+    # Normalize the edge values to the range [0, 1]
+    normalized_weights = {k: (v - min_weight) / (max_weight - min_weight) for k, v in Weights.items()}
+
+    if transformation_function  == 'reciprocal_function':
+        edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()]  ## The min-max normalizatino can be applied here die to division with 0
+    elif transformation_function  == "linear_flip_function":
+        edges = [(k[0], k[1], {'weight': (-v+1)}) for k, v in normalized_weights.items()] 
+    elif transformation_function  == "binary":
+        edges = [(k[0], k[1], {'weight': 1}) for k, v in normalized_weights.items()] 
     elif transformation_function == "none":
-        edges = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()]
+        edges = [(k[0], k[1], {'weight': v}) for k, v in normalized_weights.items()]
+
+
+    # # Create a dictionary to store the positions of edges between the same nodes
+    # edge_positions = {}
+
+    # for u, v, d in edges:
+    #     if (u, v) not in edge_positions and (v, u) not in edge_positions:
+    #         # If this is the first edge between these nodes, position it at (0, 0)
+    #         edge_positions[(u, v)] = [(0, 0)]
+    #     elif (u, v) in edge_positions:
+    #         # If there's already an edge from u to v, add a slight y-shift
+    #         edge_positions[(u, v)].append((0, len(edge_positions[(u, v)]) * 0.05))
+    #     else:
+    #         # If there's already an edge from v to u, add a slight x-shift
+    #         edge_positions[(v, u)].append((len(edge_positions[(v, u)]) * 0.05, 0))
+
+    # # Modify the positions of edges based on the calculated edge positions
+    # pos_edges = []
+    # for u, v, d in edges:
+    #     if (u, v) in edge_positions:
+    #         pos_edges.append((u, v, {'weight': d['weight'], 'pos': edge_positions[(u, v)].pop(0)}))
+    #     elif (v, u) in edge_positions:
+    #         pos_edges.append((u, v, {'weight': d['weight'], 'pos': edge_positions[(v, u)].pop(0)}))
+
+
+
+    ## Old version without normalization
+    # if transformation_function  == 'reciprocal_function':
+    #     edges = [(k[0], k[1], {'weight': 1/v}) for k, v in Weights.items()] 
+    # elif transformation_function  == "linear_flip_function":
+    #     edges = [(k[0], k[1], {'weight': (-v+int(max(Weights.values()))+1)}) for k, v in Weights.items()] 
+    # elif transformation_function  == "binary":
+    #     edges = [(k[0], k[1], {'weight': 1}) for k, v in Weights.items()] 
+
+    # elif transformation_function == "none":
+    #     edges = [(k[0], k[1], {'weight': v}) for k, v in Weights.items()]
 
     G = nx.DiGraph()
     # each edge is a tuple of the form (node1, node2, {'weight': weight})
@@ -360,15 +421,53 @@ def graph_plot(Weights, user_parameters, transformation_function):
     fig,axes= plt.subplots(figsize=(20*cm, 20*cm))
     fig.suptitle(f"Column {user_parameters['column']}, edge-length transformation: {transformation_function}")
 
-    ## nodes
+    ## NODES
     nx.draw_networkx_nodes(G,pos,node_size=300)
 
-    ## labels
+    ## LABELS
     nx.draw_networkx_labels(G,pos,font_size=6,font_family='sans-serif')
 
-    ## edges
+    ## EDGES
     #nx.draw_networkx_edges(G,pos,edgelist=edges, width=2,connectionstyle="arc3,rad=-0.2")
-    nx.draw_networkx_edges(G,pos,edgelist=edges, width=2)
+    #nx.draw_networkx_edges(G,pos,edgelist=edges, width=2) # all edges with same width
+
+    
+    # Modify the nx.draw_networkx_edges function to use the normalized edge values for width
+    widths = [d['weight']*8 for u, v, d in G.edges(data=True)]
+    #nx.draw_networkx_edges(G, pos, edgelist=edges, width=widths*2)#
+    nx.draw_networkx_edges(G, pos, width=widths,connectionstyle="arc3,rad=-0.2")
+
+
+    ## Some tests
+    # Draw the networkx edges with modified positions
+    # for u, v, d in pos_edges:
+    #     pos_u = pos[u]
+    #     pos_v = pos[v]
+    #     pos_edge = [(pos_u[0] + d['pos'][0], pos_u[1] + d['pos'][1]),
+    #                 (pos_v[0] + d['pos'][0], pos_v[1] + d['pos'][1])]
+    #     nx.draw_networkx_edges(G, edgelist=[(u, v)], width=d['weight'], pos=pos_edge, ax = axes)
+
+    # # Draw the networkx edges with modified positions
+    # for u, v, d in pos_edges:
+    #     pos = nx.circular_layout(G) 
+    #     pos_u = pos[u]
+    #     pos_v = pos[v]
+
+    #     #Shifting some positions
+    #     pos_u[0] = pos_u[0] + d['pos'][0]
+    #     pos_u[1] = pos_u[1] + d['pos'][1]
+
+    #     pos_v[0] = pos_u[0] + d['pos'][0]
+    #     pos_v[1] = pos_u[1] + d['pos'][1]
+
+    #     print([(u, v)])
+
+    #     nx.draw_networkx_edges(G, pos={u: pos_u, v: pos_v}, edgelist=[(u, v)], width=d['weight'], ax=axes)
+
+
+
+
+
 
     ## weights
     labels = nx.get_edge_attributes(G,'weight')
@@ -616,7 +715,7 @@ def direct_indirect_connections_analysis(Weights,user_parameters):
     plt.close()
     return number_partners_dict, length_dict, norm_length_dict
     
-def input_output_analysis(Weights,user_parameters):
+def input_output_analysis(Weights,neuron_ls):
     '''
     Input- ouput analysis
     Edges considered to as the number of connections (x) and not the reciprocal (1/x)
@@ -635,7 +734,7 @@ def input_output_analysis(Weights,user_parameters):
     final_output_df = pd.DataFrame() 
     final_input_ranked_df = pd.DataFrame() # In ranked dfs, neuron names are replace with numbers deptcting first, second, etc.., inputs based on #of synaptic contacts
     final_output_ranked_df = pd.DataFrame() 
-    for neuron in user_parameters['neuron_list']:
+    for neuron in neuron_ls:
         #neuron_of_interest = user_parameters['node_of_interest']
         neuron_of_interest = neuron
         input_neurons_dict = {}
@@ -1078,10 +1177,10 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
 
     #First figure, absolute connection counts
 
-    ncols = 3
+    ncols = 2
     nrows = math.ceil(len(list_of_neurons) / ncols)
-    fig, axes = plt.subplots(nrows,ncols,figsize=(ncols*10*cm, nrows*10*cm)) # All together 
-    fig.tight_layout(pad=8) # Adding some space between subplots
+    fig, axes = plt.subplots(nrows,ncols,figsize=(ncols*20*cm, nrows*20*cm)) # All together 
+    #fig.tight_layout(pad=8) # Adding some space between subplots
     
     _title = f"{user_parameters['graph']}: {user_parameters['column']} {data_name}-Heatmap"
     fig.suptitle(_title, fontsize = 12)
@@ -1098,7 +1197,10 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
                 # # Print some debugging information
                 # print(f"Neuron: {neuron}")
                 # print(f"Number of columns in _data: {_data.shape[1]}")
-                sns.heatmap(cmap=_palette,ax = axes[i,j],data = _data) 
+
+                sns.heatmap(cmap=_palette, ax=axes[i, j], data=_data, square=True, cbar=False)
+                cax = plt.colorbar(axes[i, j].collections[0], ax=axes[i, j], orientation="vertical", shrink=0.5)
+                cax.ax.tick_params(labelsize=6)
                 axes[i,j].tick_params(axis='x', labelrotation=90, labelsize=6)
                 axes[i,j].set_xlabel(f'{data_name} neuron')
                 axes[i,j].set_ylabel(f'Columns')
@@ -1112,9 +1214,9 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
     #Second figure, connections normalized to the maximum count (per each row)
 
     df_max = df.div(df.max(axis=1), axis=0).copy() # Normalization in one line
-    ncols = 3
+    ncols = 2
     nrows = math.ceil(len(list_of_neurons) / ncols)
-    fig_max, axes_max = plt.subplots(nrows,ncols,figsize=(ncols*10*cm, nrows*10*cm)) # All together 
+    fig_max, axes_max = plt.subplots(nrows,ncols,figsize=(ncols*20*cm, nrows*20*cm)) # All together 
     fig_max.tight_layout(pad=8) # Adding some space between subplots
     
     _title = f"{user_parameters['graph']}: {user_parameters['column']} {data_name}-Heatmap Normalized to max"
@@ -1128,7 +1230,8 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
             else:
                 neuron = list_of_neurons[n]
                 _data = df_max.loc[neuron].dropna(axis='columns', how ='all') # we drop columns if they only have NaN values
-                sns.heatmap(cmap=_palette,ax = axes_max[i,j],data = _data)
+                sns.heatmap(cmap=_palette, ax=axes_max[i, j], data=_data, square=True, cbar=False)
+                cax = plt.colorbar(axes_max[i, j].collections[0], ax=axes_max[i, j], orientation="vertical", shrink=0.5)
                 axes_max[i,j].tick_params(axis='x', labelrotation=90, labelsize=6)
                 axes_max[i,j].set_xlabel(f'{data_name} neuron')
                 axes_max[i,j].set_ylabel(f'Columns')
@@ -1142,9 +1245,9 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
     #Third figure, connections normalized to the sum of count (per each row)
 
     df_sum = df.div(df.sum(axis=1), axis=0).copy() # Normalization in one line
-    ncols = 3
+    ncols = 2
     nrows = math.ceil(len(list_of_neurons) / ncols)
-    fig_sum, axes_sum = plt.subplots(nrows,ncols,figsize=(ncols*10*cm, nrows*10*cm)) # All together 
+    fig_sum, axes_sum = plt.subplots(nrows,ncols,figsize=(ncols*20*cm, nrows*20*cm)) # All together 
     fig_sum.tight_layout(pad=8) # Adding some space between subplots
     
     _title = f"{user_parameters['graph']}: {user_parameters['column']} {data_name}-Heatmap Normalized to sum"
@@ -1158,7 +1261,8 @@ def heatmap_plot(short_col_names,df,list_of_neurons,user_parameters,data_name):
             else:
                 neuron = list_of_neurons[n]
                 _data = df_sum.loc[neuron].dropna(axis='columns', how ='all')  # we drop columns if they only have NaN values
-                sns.heatmap(cmap=_palette,ax = axes_sum[i,j],data = _data)
+                sns.heatmap(cmap=_palette, ax=axes_sum[i, j], data=_data, square=True, cbar=False)
+                cax = plt.colorbar(axes_sum[i, j].collections[0], ax=axes_sum[i, j], orientation="vertical", shrink=0.5)
                 axes_sum[i,j].tick_params(axis='x', labelrotation=90, labelsize=4)
                 axes_sum[i,j].set_xlabel(f'{data_name} neuron')
                 axes_sum[i,j].set_ylabel(f'Columns')

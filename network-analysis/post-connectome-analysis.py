@@ -71,6 +71,10 @@ all_col_str = '-'.join(short_col_names)
 main_processed_data_folder = os.path.join(main_data_folder,'processed-data',graph) # 
 pkl_folder = main_processed_data_folder
 
+save_dir = os.path.join(main_processed_data_folder, 'Figures')
+if not os.path.exists(save_dir):
+            os.mkdir(save_dir) # Seb: creating figures folder 
+
 user_parameters = {}
 user_parameters['dataPath']= main_data_folder
 user_parameters['processed_data_folder']= main_processed_data_folder
@@ -95,6 +99,8 @@ all_columns_weigth_line_df_list = []
 all_columns_partners_df_list = []
 all_columns_weigth_df_list = []
 
+
+all_columns_final_input_instances_df_list = []
 #%% Loading and aggregating data from different files
 
 i = len(pkl_file_list)  # Temp to denote one pickle file being uploaded
@@ -106,6 +112,7 @@ for files in range(i): #Looping across files
 
     #DataFrames
     temp_final_input_df = data['final_input_df']
+    temp_final_input_instances_df = data['final_input_instances_df']
     temp_final_output_df = data['final_output_df']
     temp_final_input_ranked_df = data['final_input_ranked_df']
     temp_final_output_ranked_df = data['final_output_ranked_df']
@@ -116,6 +123,7 @@ for files in range(i): #Looping across files
     #temp_weigth_df = pd.DataFrame(data['length_dict']) # Temp commented out
 
     all_columns_final_input_df_list.append(temp_final_input_df)
+    all_columns_final_input_instances_df_list.append(temp_final_input_instances_df)
     all_columns_final_output_df_list.append(temp_final_input_df)
     all_columns_final_input_ranked_df_list.append(temp_final_input_df)
     all_columns_final_output_ranked_df_list.append(temp_final_input_df)
@@ -142,6 +150,7 @@ for files in range(i): #Looping across files
 all_columns_centrality_df = pd.concat(all_columns_centrality_df_list)
 all_columns_path_df = pd.concat(all_columns_path_df_list)
 all_columns_final_input_df = pd.concat(all_columns_final_input_df_list)
+all_columns_final_input_instances_df = pd.concat(all_columns_final_input_instances_df_list)
 all_columns_final_output_df = pd.concat(all_columns_final_output_df_list)
 all_columns_final_input_ranked_df = pd.concat(all_columns_final_input_ranked_df_list)
 all_columns_final_output_ranked_df = pd.concat(all_columns_final_output_ranked_df_list)
@@ -155,7 +164,7 @@ all_columns_final_output_ranked_df = pd.concat(all_columns_final_output_ranked_d
 #all_columns_partners_df.rename(columns = {'index':'Column index'}, inplace = True) # Temp commented out
 #all_columns_weigth_df.rename(columns = {'index':'Column index'}, inplace = True) # Temp commented out
 
-#%% Plotting
+#%% Plotting heat maps
 cm = 1/2.54  # centimeters in inches
 _ci=68 # confidence interval of 68 is ~1 standard error
 
@@ -164,16 +173,30 @@ list_of_neurons = ['Tm1','Tm2','Tm4', 'Tm9', 'Mi1','Tm3','Mi4', 'Mi9'] #
 list_of_neurons = ['L1','L3','L5','Mi1','Tm3','CT1','C3', 'C2', 'Mi4', 'Mi9','T4a','T4b','T4c','T4d']# 
 list_of_neurons = ['L1','L3','L5','Mi1','Tm3','CT1','C3', 'C2', 'Mi4', 'Mi9']# 
 list_of_neurons = ['L1','L3','L5','Mi1','C3', 'C2', 'Mi4', 'Mi9']# 
+list_of_neurons = ['T4a','T4b','T4c','T4d']# 
+list_of_neuron_instances = ['T4a-fb home','T4b-bf home','T4c-du home','T4d-ud home']
+
+
 fig_heatmap, fig_heatmap_max, fig_heatmap_sum = heatmap_plot(short_col_names,all_columns_final_input_df,list_of_neurons,user_parameters,'Input')
+fig_heatmap_instances, fig_heatmap_max_instances, fig_heatmap_sum_instances = heatmap_plot(short_col_names,all_columns_final_input_instances_df,list_of_neuron_instances,user_parameters,'Input')
 
 if save_figures:
     #Quick save to visualize:
-    fig_heatmap.savefig(main_data_folder +'\heatmap.pdf')
-    fig_heatmap_max.savefig(main_data_folder +'\heatmap_max.pdf')
-    fig_heatmap_sum.savefig(main_data_folder +'\heatmap_sum.pdf')
-    plt.close(fig_heatmap)
-    plt.close(fig_heatmap_max)
-    plt.close(fig_heatmap_sum)
+    fig_heatmap.savefig(save_dir +'\heatmap.pdf')
+    fig_heatmap_max.savefig(save_dir +'\heatmap_max.pdf')
+    fig_heatmap_sum.savefig(save_dir +'\heatmap_sum.pdf')
+    # plt.close(fig_heatmap)
+    # plt.close(fig_heatmap_max)
+    # plt.close(fig_heatmap_sum)
+
+    #Quick save to visualize:
+    fig_heatmap_instances.savefig(save_dir +'\heatmap_instances.pdf')
+    fig_heatmap_max_instances.savefig(save_dir +'\heatmap_max_instances.pdf')
+    fig_heatmap_sum_instances.savefig(save_dir +'\heatmap_sum_instances.pdf')
+    # plt.close(fig_heatmap_instances)
+    # plt.close(fig_heatmap_max_instances)
+    # plt.close(fig_heatmap_sum_instances)
+    plt.close('all')
 
 ###############################################################################
 #TODO Move this to an funtion or make the function direct_indirect_connections_plot more flexible to plot this as well
@@ -273,7 +296,7 @@ if save_figures:
 fig_centrality = centrality_plot(all_columns_centrality_df,user_parameters)
 if save_figures:
     #Quick save to visualize:
-    #fig_centrality.savefig(main_data_folder +'\centrality_all_columns_1.pdf')
+    #fig_centrality.savefig(save_dir +'\centrality_all_columns_1.pdf')
     #plt.close(fig_centrality)
     pass
 
@@ -342,7 +365,7 @@ bar_fig_c.suptitle(_title, fontsize = 12)
 
 if save_figures:
     #Quick save to visualize:
-    # bar_fig_c.savefig(main_data_folder +'\centrality_all_columns_2.pdf')
+    # bar_fig_c.savefig(save_dir +'\centrality_all_columns_2.pdf')
     # plt.close(bar_fig_c)
     pass
 
