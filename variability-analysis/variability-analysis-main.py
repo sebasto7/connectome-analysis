@@ -117,7 +117,7 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'L_R'  # 'L', 'R', 'L_R'
+optic_lobe = 'R'  # 'L', 'R', 'L_R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
 mesh_ME = 'ME_L' # 'ME_R' , 'ME_L' 
 mesh_LO = 'LO_L' # 'LO_R' , 'LO_L'
@@ -141,7 +141,7 @@ save_clusters_txt = True
 
 #Path and file
 PC_disc = 'D'
-dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets'#r'C:\Connectomics-Data\FlyWire\Excels\drive-data-sets'
+dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets\submission_nature'# '~\Connectomics-Data\FlyWire\Excels\drive-data-sets'
 fileDate = '20230823'
 fileName = f'{neuron_of_interest}_neurons_input_count_{optic_lobe}_{fileDate}.xlsx'
 #fileName = f'Tm9_neurons_input_count_L_R_OA_subtypes_20230718.xlsx' # Remove this line after OA plots are done
@@ -1100,13 +1100,13 @@ curr_abs_stats_no_ouliers_df['mean'] = curr_abs_stats_no_ouliers_df.mean(axis=1)
 
 ######################################### DIMENTIONALITY Reduction #######################################
 ################################################   PCA   #################################################
-#TODO check the code, something is wrong. PCA values are not centeres in 0
-order = ['L3','Mi4','CT1','Tm16','Dm12','Tm20','C3','Tm1','PS125','L4','ML1','TmY17','C2','OA-AL2b2','Tm2','Mi13','putative-fru-N.I.','Tm5c','Me-Lo-2-N.I.','TmY15']
+# #For PCA plot in figure 5
+# order = ['L3','Mi4','CT1','Tm16','Dm12','Tm20','C3','Tm1','PS125','L4','ML1','TmY17','C2','OA-AL2b2','Tm2','Mi13','putative-fru-N.I.','Tm5c','Me-Lo-2-N.I.','TmY15']
+# rel_data = syn_popularity_rel_df[order].copy()
 
 #For relative counts:
 # Data
 rel_data = syn_popularity_rel_df[presence_threshold_sorted_column_order].copy()
-rel_data = syn_popularity_rel_df[order].copy()
 rel_data= rel_data.fillna(0)
 rel_data_array = rel_data.to_numpy(dtype=int,copy=True)
 
@@ -2897,7 +2897,7 @@ if permutation_analysis:
                 plt.close(fig)
 
 
-############################################# BOXPLOTS - PLOTS ##############################################
+############################################     BOX-PLOTS     ##############################################
 #############################################################################################################
 
 ############################################# PRESYNAPTIC COUNTS ############################################
@@ -2999,10 +2999,10 @@ if all([cluster_with_dendrogram, not d_v_filter]):
 
 
 
-############################################# BOXPLOTS - PLOTS ##############################################
-#############################################################################################################
+#############################################    VIOLIN-PLOTS     ##############################################
+################################################################################################################
 
-############################################# PRESYNAPTIC COUNTS ############################################
+############################################# PRESYNAPTIC COUNTS ###############################################
 
 # Data
 if relative_or_absolute == 'absolute-counts':
@@ -3090,7 +3090,89 @@ if save_figures:
     print('FIGURE: Visualization of presynaptic partners contacts')
 plt.close(fig)
 
+ 
+#############################################     SWARM-PLOTS     ##############################################
+################################################################################################################
 
+############################################# PRESYNAPTIC COUNTS ###############################################
+_bound = 0.3 # 30% above or below the mean
+hline_span = 0.3 # how long the lines for the bounds are
+
+# Relative and absolute counts across columns
+# Data
+_data = syn_popularity_rel_df.copy()[presence_threshold_sorted_column_order]#  filtering based on " presence_threshold"
+
+# Calculate mean and upper/lower bounds
+mean_values = _data.mean(axis=0)
+upper_bound = mean_values + _bound * mean_values
+lower_bound = mean_values - _bound * mean_values
+
+
+
+#Figure
+fig, axs = plt.subplots(nrows=2,ncols=1,figsize=(30*cm, 30*cm))
+fig.tight_layout(pad=10) # Adding some space between subplots
+
+# First axes 
+sns.swarmplot(data = _data, ax = axs[0])
+axs[0].set_title(f'{neuron_of_interest},  count % of popular neurons (syn>={min_desired_count}), sorted by {sort_by}')
+axs[0].set_ylabel('Synaptic count (%) ', size = 12)
+axs[0].set_xlabel('Presynaptic neuron', size = 12)
+axs[0].set_xticklabels(_data, rotation=90, size = 10) # old sorting: _data[_data.max().sort_values(ascending = False).index]
+axs[0].set_ylim(top = 65) #set same y lim for Tm9 and Tm1
+axs[0].set_yticklabels(axs[0].get_yticks(), size = 8)
+sns.despine(left=False, bottom=False)
+
+# Plot upper and lower bounds lines within the x-axis limits
+# Extract x-axis tick positions
+x_positions = axs[0].get_xticks()
+# Plot upper and lower bounds lines at tick positions for the first subplot
+for col, upper, lower, x, mean in zip(_data.columns, upper_bound, lower_bound, x_positions, mean_values):
+    # Calculate custom xmin and xmax values
+    xmin = x - hline_span
+    xmax = x + hline_span
+    # Create a horizontal line using ax.plot
+    axs[0].plot([xmin, xmax], [upper, upper], color='k', linestyle='--',zorder=3)
+    axs[0].plot([xmin, xmax], [lower, lower], color='k', linestyle='--',zorder=3)
+    axs[0].plot([xmin, xmax], [mean, mean], color='g', linestyle='-',zorder=3)
+
+# Data
+_data = syn_popularity_abs_df.copy()[presence_threshold_sorted_column_order]#  filtering based on " presence_threshold"
+
+# Calculate mean and upper/lower bounds
+mean_values = _data.mean(axis=0)
+upper_bound = mean_values + _bound * mean_values
+lower_bound = mean_values - _bound * mean_values
+
+# Next axes 
+sns.swarmplot(data = _data, ax = axs[1])
+axs[1].set_title(f'{neuron_of_interest},  Absolute count of popular neurons (syn>={min_desired_count}), sorted by {sort_by}')
+axs[1].set_ylabel('Synaptic count', size = 12)
+axs[1].set_xlabel('Presynaptic neuron', size = 12)
+axs[1].set_xticklabels(_data, rotation=90, size = 10) # old sorting: _data[_data.max().sort_values(ascending = False).index]
+axs[1].set_yticklabels(axs[1].get_yticks(), size = 8)
+sns.despine(left=False, bottom=False)
+
+# Plot upper and lower bounds lines within the x-axis limits
+# Extract x-axis tick positions
+x_positions = axs[1].get_xticks()
+# Plot upper and lower bounds lines at tick positions for the first subplot
+for col, upper, lower, x, mean in zip(_data.columns, upper_bound, lower_bound, x_positions, mean_values):
+    # Calculate custom xmin and xmax values
+    xmin = x - hline_span
+    xmax = x + hline_span
+    # Create a horizontal line using ax.plot
+    axs[1].plot([xmin, xmax], [upper, upper], color='k', linestyle='--',zorder=3)
+    axs[1].plot([xmin, xmax], [lower, lower], color='k', linestyle='--',zorder=3)
+    axs[1].plot([xmin, xmax], [mean, mean], color='g', linestyle='-',zorder=3)
+
+#Plot saving
+if save_figures:
+    save_path =  f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Swarm-plot-presynaptic-partners_{dataset_name}_{neuron_of_interest}_{sort_by}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Visualization of presynaptic partners contacts')
+plt.close(fig)
 
 ################################################ BAR - PLOTS ################################################
 #############################################################################################################
