@@ -75,7 +75,7 @@ color_cat_set = "Set1" # select a set for a seaborn color palette
 hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3', Tm2: 'light:#a6761d'
 neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3', Tm2: '#a6761d'
 #YES-NO options
-save_figures = False
+save_figures = True
 exclude_outliers = True # Plot variability without outliers
 stacked_plots = False 
 
@@ -1309,40 +1309,97 @@ if saving_processed_data:
 ######################################## Total number of synapses ##########################################
 
 
-fig, axs = plt.subplots()
+# fig, axs = plt.subplots()
 
-# Plot the first boxplot
-df_0_grouped = df_0.groupby(['instance_post']).agg({'W_new': sum})
-df_0_box = axs.boxplot(df_0_grouped['W_new'], positions=[0], widths=0.4, showmeans=True)
+# # Plot the first boxplot
+# df_0_grouped = df_0.groupby(['instance_post']).agg({'W_new': sum})
+# df_0_box = axs.boxplot(df_0_grouped['W_new'], positions=[0], widths=0.4, showmeans=True)
 
-# Plot the second boxplot
+# # Plot the second boxplot
+# syn_df_grouped = syn_df.groupby(['instance_post']).agg({'W_new': sum})
+# syn_df_box = axs.boxplot(syn_df_grouped['W_new'], positions=[0.6], widths=0.4, showmeans=True)
+
+
+# # Set the font size of y and x labels and ticks
+# axs.set_ylabel('Synaptic contacts', fontsize=12)
+# axs.set_xlabel(dataset_name, fontsize=12)
+# axs.tick_params(axis='both', which='both', labelsize=10)
+# # Remove the background grid
+# axs.grid(False)
+# # Remove the left and upper border lines
+# axs.spines['right'].set_visible(False)
+# axs.spines['top'].set_visible(False)
+# # Set the x-axis tick positions and labels
+# axs.set_xticks([0, 0.6])
+# axs.set_xticklabels(['all', '>=3'])
+# # Add mean ± std as text above each boxplot
+# positions = [0, 0.6]
+# for i, box in enumerate([df_0_box, syn_df_box]):
+#     x = positions[i]
+#     y = box['medians'][0].get_ydata()[0]
+#     data = df_0_grouped['W_new'] if i == 0 else syn_df_grouped['W_new']
+#     mean = np.mean(data)
+#     std = np.std(data)
+#     text = f'{mean:.2f} ± {std:.2f}'
+#     axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
+# plt.close(fig)
+
+#Data
 syn_df_grouped = syn_df.groupby(['instance_post']).agg({'W_new': sum})
-syn_df_box = axs.boxplot(syn_df_grouped['W_new'], positions=[0.6], widths=0.4, showmeans=True)
+df_0_grouped = df_0.groupby(['instance_post']).agg({'W_new': sum})
 
+# Create a 2x2 grid of subplots
+fig= plt.figure(figsize=(10, 8))
+G = gridspec.GridSpec(2, 2)
 
-# Set the font size of y and x labels and ticks
-axs.set_ylabel('Synaptic contacts', fontsize=12)
-axs.set_xlabel(dataset_name, fontsize=12)
-axs.tick_params(axis='both', which='both', labelsize=10)
-# Remove the background grid
-axs.grid(False)
-# Remove the left and upper border lines
-axs.spines['right'].set_visible(False)
-axs.spines['top'].set_visible(False)
+# Boxplot for df_0
+boxprops_df_0 = dict(color='blue')
+box_plot = plt.subplot(G[0, 0])
+box_plot.boxplot(df_0_grouped['W_new'], positions=[0], widths=0.4, showmeans=False, boxprops=boxprops_df_0)
+boxprops_syn_df = dict(color='orange')
+box_plot.boxplot(syn_df_grouped['W_new'], positions=[0.6], widths=0.4, showmeans=False, boxprops=boxprops_syn_df)
+
+# Set the font size of y and x labels and ticks for boxplots
+box_plot.set_ylabel('Synaptic contacts', fontsize=12)
+box_plot.set_xlabel(dataset_name, fontsize=12)
+box_plot.tick_params(axis='both', which='both', labelsize=10)
+box_plot.grid(False)
+box_plot.spines['right'].set_visible(False)
+box_plot.spines['top'].set_visible(False)
 # Set the x-axis tick positions and labels
-axs.set_xticks([0, 0.6])
-axs.set_xticklabels(['all', '>=3'])
-# Add mean ± std as text above each boxplot
-positions = [0, 0.6]
-for i, box in enumerate([df_0_box, syn_df_box]):
-    x = positions[i]
-    y = box['medians'][0].get_ydata()[0]
-    data = df_0_grouped['W_new'] if i == 0 else syn_df_grouped['W_new']
-    mean = np.mean(data)
-    std = np.std(data)
-    text = f'{mean:.2f} ± {std:.2f}'
-    axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
+box_plot.set_xticks([0, 0.6])
+box_plot.set_xticklabels(['all syn', 'syn >=3'])
+
+
+# Plot histogram in the second row, second column
+hist_plot = plt.subplot(G[0,1])
+hist_plot.hist([df_0_grouped['W_new'], syn_df_grouped['W_new']], bins=10, label=['all syn', 'syn >=3'])
+hist_plot.set_xlabel('Synaptic contacts', fontsize=12)
+hist_plot.tick_params(axis='both', which='both', labelsize=10)
+hist_plot.set_ylabel('Frequency', fontsize=12)
+hist_plot.legend()
+
+
+# Plot bar plot in the second row, first column
+bar_plot = plt.subplot(G[1,:])
+bar_plot.bar(df_0_grouped.index, df_0_grouped['W_new'], label='all syn')
+bar_plot.bar(syn_df_grouped.index, syn_df_grouped['W_new'], label='syn >=3')
+bar_plot.set_ylabel('Synaptic contacts', fontsize=12)
+bar_plot.tick_params(axis='both', which='both', labelsize=10)
+bar_plot.set_xlabel(dataset_name, fontsize=12)
+bar_plot.set_xlabel('Columns', fontsize=12)
+bar_plot.set_xticklabels([])
+bar_plot.legend()
+
+
+if save_figures:
+    # Quick plot saving
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Total-number-synapses_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Box-plots comparing categories')
 plt.close(fig)
+
 
 ######################################## Total number of presynaptic partners ##########################################
 fig, axs = plt.subplots()
@@ -1377,6 +1434,14 @@ for i, box in enumerate([df_0_box, syn_df_box]):
     std = np.std(data)
     text = f'{mean:.2f} ± {std:.2f}'
     axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
+plt.close(fig)
+
+if save_figures:
+    # Quick plot saving
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Total-number-presynaptic-neurons_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Box-plots comparing categories')
 plt.close(fig)
 
 
@@ -1415,6 +1480,16 @@ for i, box in enumerate([df_0_box, syn_df_box]):
     text = f'{mean:.2f} ± {std:.2f}'
     axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
 plt.close(fig)
+
+if save_figures:
+    # Quick plot saving
+    save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+    figure_title = f'\Total-number-presynaptic-types_{dataset_name}_{neuron_of_interest}.pdf'
+    fig.savefig(save_path+figure_title)
+    print('FIGURE: Box-plots comparing categories')
+plt.close(fig)
+
+
 
 
 
