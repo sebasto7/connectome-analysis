@@ -1304,49 +1304,16 @@ if saving_processed_data:
 ################################################# BAR - PLOTS ##############################################
 ############################################################################################################
 
-# Itinial barplots for non-filtered and filtered data abput total number of synapses and neurons per column
+# Itinial barplots for non-filtered and filtered data about total number of synapses and neurons per column
 
 ######################################## Total number of synapses ##########################################
 
 
-# fig, axs = plt.subplots()
-
-# # Plot the first boxplot
-# df_0_grouped = df_0.groupby(['instance_post']).agg({'W_new': sum})
-# df_0_box = axs.boxplot(df_0_grouped['W_new'], positions=[0], widths=0.4, showmeans=True)
-
-# # Plot the second boxplot
-# syn_df_grouped = syn_df.groupby(['instance_post']).agg({'W_new': sum})
-# syn_df_box = axs.boxplot(syn_df_grouped['W_new'], positions=[0.6], widths=0.4, showmeans=True)
-
-
-# # Set the font size of y and x labels and ticks
-# axs.set_ylabel('Synaptic contacts', fontsize=12)
-# axs.set_xlabel(dataset_name, fontsize=12)
-# axs.tick_params(axis='both', which='both', labelsize=10)
-# # Remove the background grid
-# axs.grid(False)
-# # Remove the left and upper border lines
-# axs.spines['right'].set_visible(False)
-# axs.spines['top'].set_visible(False)
-# # Set the x-axis tick positions and labels
-# axs.set_xticks([0, 0.6])
-# axs.set_xticklabels(['all', '>=3'])
-# # Add mean ± std as text above each boxplot
-# positions = [0, 0.6]
-# for i, box in enumerate([df_0_box, syn_df_box]):
-#     x = positions[i]
-#     y = box['medians'][0].get_ydata()[0]
-#     data = df_0_grouped['W_new'] if i == 0 else syn_df_grouped['W_new']
-#     mean = np.mean(data)
-#     std = np.std(data)
-#     text = f'{mean:.2f} ± {std:.2f}'
-#     axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
-# plt.close(fig)
-
 #Data
 syn_df_grouped = syn_df.groupby(['instance_post']).agg({'W_new': sum})
 df_0_grouped = df_0.groupby(['instance_post']).agg({'W_new': sum})
+data_label = 'Synaptic contacts'
+data_variable = 'W_new'
 
 # Create a 2x2 grid of subplots
 fig= plt.figure(figsize=(10, 8))
@@ -1355,12 +1322,12 @@ G = gridspec.GridSpec(2, 2)
 # Boxplot for df_0
 boxprops_df_0 = dict(color='blue')
 box_plot = plt.subplot(G[0, 0])
-box_plot.boxplot(df_0_grouped['W_new'], positions=[0], widths=0.4, showmeans=False, boxprops=boxprops_df_0)
+box_plot.boxplot(df_0_grouped[data_variable], positions=[0], widths=0.4, showmeans=False, boxprops=boxprops_df_0)
 boxprops_syn_df = dict(color='orange')
-box_plot.boxplot(syn_df_grouped['W_new'], positions=[0.6], widths=0.4, showmeans=False, boxprops=boxprops_syn_df)
+box_plot.boxplot(syn_df_grouped[data_variable], positions=[0.6], widths=0.4, showmeans=False, boxprops=boxprops_syn_df)
 
 # Set the font size of y and x labels and ticks for boxplots
-box_plot.set_ylabel('Synaptic contacts', fontsize=12)
+box_plot.set_ylabel(data_label, fontsize=12)
 box_plot.set_xlabel(dataset_name, fontsize=12)
 box_plot.tick_params(axis='both', which='both', labelsize=10)
 box_plot.grid(False)
@@ -1373,8 +1340,8 @@ box_plot.set_xticklabels(['all syn', 'syn >=3'])
 
 # Plot histogram in the second row, second column
 hist_plot = plt.subplot(G[0,1])
-hist_plot.hist([df_0_grouped['W_new'], syn_df_grouped['W_new']], bins=10, label=['all syn', 'syn >=3'])
-hist_plot.set_xlabel('Synaptic contacts', fontsize=12)
+hist_plot.hist([df_0_grouped[data_variable], syn_df_grouped[data_variable]], bins=10, label=['all syn', 'syn >=3'])
+hist_plot.set_xlabel(data_label, fontsize=12)
 hist_plot.tick_params(axis='both', which='both', labelsize=10)
 hist_plot.set_ylabel('Frequency', fontsize=12)
 hist_plot.legend()
@@ -1382,14 +1349,15 @@ hist_plot.legend()
 
 # Plot bar plot in the second row, first column
 bar_plot = plt.subplot(G[1,:])
-bar_plot.bar(df_0_grouped.index, df_0_grouped['W_new'], label='all syn')
-bar_plot.bar(syn_df_grouped.index, syn_df_grouped['W_new'], label='syn >=3')
-bar_plot.set_ylabel('Synaptic contacts', fontsize=12)
+bar_plot.bar(df_0_grouped.index, df_0_grouped[data_variable], label='all syn')
+bar_plot.bar(syn_df_grouped.index, syn_df_grouped[data_variable], label='syn >=3')
+bar_plot.set_ylabel(data_label, fontsize=12)
 bar_plot.tick_params(axis='both', which='both', labelsize=10)
 bar_plot.set_xlabel(dataset_name, fontsize=12)
 bar_plot.set_xlabel('Columns', fontsize=12)
 bar_plot.set_xticklabels([])
 bar_plot.legend()
+
 
 
 if save_figures:
@@ -1402,39 +1370,55 @@ plt.close(fig)
 
 
 ######################################## Total number of presynaptic partners ##########################################
-fig, axs = plt.subplots()
 
-# Plot the first boxplot
-df_0_grouped = df_0.groupby(['instance_post']).agg({'type_pre':'count'})
-df_0_box = axs.boxplot(df_0_grouped['type_pre'], positions=[0], widths=0.4, showmeans=True)
-
-# Plot the second boxplot
+#Data
 syn_df_grouped = syn_df.groupby(['instance_post']).agg({'type_pre':'count'})
-syn_df_box = axs.boxplot(syn_df_grouped['type_pre'], positions=[0.6], widths=0.4, showmeans=True)
+df_0_grouped = df_0.groupby(['instance_post']).agg({'type_pre':'count'})
+data_label = 'Presynaptic partners / segments'
+data_variable = 'type_pre'
 
-# Set the font size of y and x labels and ticks
-axs.set_ylabel('Number of presynaptic partners / segments', fontsize=12)
-axs.set_xlabel(dataset_name, fontsize=12)
-axs.tick_params(axis='both', which='both', labelsize=10)
-# Remove the background grid
-axs.grid(False)
-# Remove the left and upper border lines
-axs.spines['right'].set_visible(False)
-axs.spines['top'].set_visible(False)
+# Create a 2x2 grid of subplots
+fig= plt.figure(figsize=(10, 8))
+G = gridspec.GridSpec(2, 2)
+
+# Boxplot for df_0
+boxprops_df_0 = dict(color='blue')
+box_plot = plt.subplot(G[0, 0])
+box_plot.boxplot(df_0_grouped[data_variable], positions=[0], widths=0.4, showmeans=False, boxprops=boxprops_df_0)
+boxprops_syn_df = dict(color='orange')
+box_plot.boxplot(syn_df_grouped[data_variable], positions=[0.6], widths=0.4, showmeans=False, boxprops=boxprops_syn_df)
+
+# Set the font size of y and x labels and ticks for boxplots
+box_plot.set_ylabel(data_label, fontsize=12)
+box_plot.set_xlabel(dataset_name, fontsize=12)
+box_plot.tick_params(axis='both', which='both', labelsize=10)
+box_plot.grid(False)
+box_plot.spines['right'].set_visible(False)
+box_plot.spines['top'].set_visible(False)
 # Set the x-axis tick positions and labels
-axs.set_xticks([0, 0.6])
-axs.set_xticklabels(['all', '>=3'])
-# Add mean ± std as text above each boxplot
-positions = [0, 0.6]
-for i, box in enumerate([df_0_box, syn_df_box]):
-    x = positions[i]
-    y = box['medians'][0].get_ydata()[0]
-    data = df_0_grouped['type_pre'] if i == 0 else syn_df_grouped['type_pre']
-    mean = np.mean(data)
-    std = np.std(data)
-    text = f'{mean:.2f} ± {std:.2f}'
-    axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
-plt.close(fig)
+box_plot.set_xticks([0, 0.6])
+box_plot.set_xticklabels(['all syn', 'syn >=3'])
+
+
+# Plot histogram in the second row, second column
+hist_plot = plt.subplot(G[0,1])
+hist_plot.hist([df_0_grouped[data_variable], syn_df_grouped[data_variable]], bins=10, label=['all syn', 'syn >=3'])
+hist_plot.set_xlabel(data_label, fontsize=12)
+hist_plot.tick_params(axis='both', which='both', labelsize=10)
+hist_plot.set_ylabel('Frequency', fontsize=12)
+hist_plot.legend()
+
+
+# Plot bar plot in the second row, first column
+bar_plot = plt.subplot(G[1,:])
+bar_plot.bar(df_0_grouped.index, df_0_grouped[data_variable], label='all syn')
+bar_plot.bar(syn_df_grouped.index, syn_df_grouped[data_variable], label='syn >=3')
+bar_plot.set_ylabel(data_label, fontsize=12)
+bar_plot.tick_params(axis='both', which='both', labelsize=10)
+bar_plot.set_xlabel(dataset_name, fontsize=12)
+bar_plot.set_xlabel('Columns', fontsize=12)
+bar_plot.set_xticklabels([])
+bar_plot.legend()
 
 if save_figures:
     # Quick plot saving
@@ -1444,42 +1428,57 @@ if save_figures:
     print('FIGURE: Box-plots comparing categories')
 plt.close(fig)
 
-
 ######################################## Total number of presynaptic cell types ##########################################
-fig, axs = plt.subplots()
 
-# Plot the first boxplot
-df_0_grouped = df_0.groupby(['instance_post']).agg({'type_pre':'nunique'})
-df_0_box = axs.boxplot(df_0_grouped['type_pre'], positions=[0], widths=0.4, showmeans=True)
-
-# Plot the second boxplot
+#Data
 syn_df_grouped = syn_df.groupby(['instance_post']).agg({'type_pre':'nunique'})
-syn_df_box = axs.boxplot(syn_df_grouped['type_pre'], positions=[0.6], widths=0.4, showmeans=True)
+df_0_grouped = df_0.groupby(['instance_post']).agg({'type_pre':'nunique'})
+data_label = 'Presynaptic cell types / segments'
+data_variable = 'type_pre'
 
+# Create a 2x2 grid of subplots
+fig= plt.figure(figsize=(10, 8))
+G = gridspec.GridSpec(2, 2)
 
-# Set the font size of y and x labels and ticks
-axs.set_ylabel('Number of presynaptic cell types / segments', fontsize=12)
-axs.set_xlabel(dataset_name, fontsize=12)
-axs.tick_params(axis='both', which='both', labelsize=10)
-# Remove the background grid
-axs.grid(False)
-# Remove the left and upper border lines
-axs.spines['right'].set_visible(False)
-axs.spines['top'].set_visible(False)
+# Boxplot for df_0
+boxprops_df_0 = dict(color='blue')
+box_plot = plt.subplot(G[0, 0])
+box_plot.boxplot(df_0_grouped[data_variable], positions=[0], widths=0.4, showmeans=False, boxprops=boxprops_df_0)
+boxprops_syn_df = dict(color='orange')
+box_plot.boxplot(syn_df_grouped[data_variable], positions=[0.6], widths=0.4, showmeans=False, boxprops=boxprops_syn_df)
+
+# Set the font size of y and x labels and ticks for boxplots
+box_plot.set_ylabel(data_label, fontsize=12)
+box_plot.set_xlabel(dataset_name, fontsize=12)
+box_plot.tick_params(axis='both', which='both', labelsize=10)
+box_plot.grid(False)
+box_plot.spines['right'].set_visible(False)
+box_plot.spines['top'].set_visible(False)
 # Set the x-axis tick positions and labels
-axs.set_xticks([0, 0.6])
-axs.set_xticklabels(['all', '>=3'])
-# Add mean ± std as text above each boxplot
-positions = [0, 0.6]
-for i, box in enumerate([df_0_box, syn_df_box]):
-    x = positions[i]
-    y = box['medians'][0].get_ydata()[0]
-    data = df_0_grouped['type_pre'] if i == 0 else syn_df_grouped['type_pre']
-    mean = np.mean(data)
-    std = np.std(data)
-    text = f'{mean:.2f} ± {std:.2f}'
-    axs.text(x, y + 0.2, text, ha='center', va='bottom', fontsize=10)
-plt.close(fig)
+box_plot.set_xticks([0, 0.6])
+box_plot.set_xticklabels(['all syn', 'syn >=3'])
+
+
+# Plot histogram in the second row, second column
+hist_plot = plt.subplot(G[0,1])
+hist_plot.hist([df_0_grouped[data_variable], syn_df_grouped[data_variable]], bins=10, label=['all syn', 'syn >=3'])
+hist_plot.set_xlabel(data_label, fontsize=12)
+hist_plot.tick_params(axis='both', which='both', labelsize=10)
+hist_plot.set_ylabel('Frequency', fontsize=12)
+hist_plot.legend()
+
+
+# Plot bar plot in the second row, first column
+bar_plot = plt.subplot(G[1,:])
+bar_plot.bar(df_0_grouped.index, df_0_grouped[data_variable], label='all syn')
+bar_plot.bar(syn_df_grouped.index, syn_df_grouped[data_variable], label='syn >=3')
+bar_plot.set_ylabel(data_label, fontsize=12)
+bar_plot.tick_params(axis='both', which='both', labelsize=10)
+bar_plot.set_xlabel(dataset_name, fontsize=12)
+bar_plot.set_xlabel('Columns', fontsize=12)
+bar_plot.set_xticklabels([])
+bar_plot.legend()
+
 
 if save_figures:
     # Quick plot saving
