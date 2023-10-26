@@ -62,7 +62,7 @@ matplotlib.rcParams['ps.fonttype'] = 42
 cm = 1/2.54  # centimeters in inches
 
 #Sorting options for plots
-sort_by = 'mean_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%', 'mean_abs_count'
+sort_by = 'mean_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%', 'mean_abs_count' (used in the Nature submission)
 #Choosing type of data for cosine similarity and cluster analysis
 relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts' 
 
@@ -141,8 +141,8 @@ save_clusters_txt = True
 
 #Path and file
 PC_disc = 'D'
-dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets\submission_nature'# '~\Connectomics-Data\FlyWire\Excels\drive-data-sets'
-fileDate = '20230823'
+dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets'# '~\Connectomics-Data\FlyWire\Excels\drive-data-sets' ,'~\Connectomics-Data\FlyWire\Excels\drive-data-sets\submission_nature',
+fileDate = '490_20231025'
 fileName = f'{neuron_of_interest}_neurons_input_count_{optic_lobe}_{fileDate}.xlsx'
 #fileName = f'Tm9_neurons_input_count_L_R_OA_subtypes_20230718.xlsx' # Remove this line after OA plots are done
 fileName_database = f'{neuron_of_interest} proofreadings_{fileDate}.xlsx'
@@ -155,7 +155,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_healthy_L3_{optic_lobe}.txt' # 'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_490_{optic_lobe}.txt' # 'Tm9_490_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 
 # Healthy columns based on lamina detachement and damage L3s
@@ -380,17 +380,17 @@ for instance in df['instance_post'].unique():
     curr_df = curr_df[curr_df['W_new']>=min_desired_count].copy()
 
     #For table across columns
-    identity_dict[curr_df['instance_post'][0]] = curr_df['instance_pre'][0:last_input_neuron]
+    identity_dict[curr_df['instance_post'].unique().tolist()[0]] = curr_df['instance_pre'][0:last_input_neuron] # curr_df['instance_post'].unique().tolist()[0] expects a single value
     identity_df= pd.DataFrame(identity_dict) # Here it concatenates at every loop
-    identity_type_dict[curr_df['instance_post'][0]] = curr_df['type_pre'][0:last_input_neuron]
+    identity_type_dict[curr_df['instance_post'].unique().tolist()[0]] = curr_df['type_pre'][0:last_input_neuron]
     identity_type_df= pd.DataFrame(identity_type_dict) # Here it concatenates at every loop
-    identity_type_middle_rank_dict[curr_df['instance_post'][0]] = curr_df['type_pre'][last_input_neuron:]
+    identity_type_middle_rank_dict[curr_df['instance_post'].unique().tolist()[0]] = curr_df['type_pre'][last_input_neuron:]
     identity_type_middle_rank_df= pd.DataFrame(identity_type_middle_rank_dict) # Here it concatenates at every loop
     
     
     #print(f"Input coverage up to the {_end}th input: {round(curr_df['W_percentatge'][0:7].sum(),2)} %")
-    abs_connections_dict[curr_df['instance_post'][0]] = curr_df['W_new'][0:last_input_neuron]
-    rel_connections_dict[curr_df['instance_post'][0]] = curr_df['W_percentatge'][0:last_input_neuron]
+    abs_connections_dict[curr_df['instance_post'].unique().tolist()[0]] = curr_df['W_new'][0:last_input_neuron]
+    rel_connections_dict[curr_df['instance_post'].unique().tolist()[0]] = curr_df['W_percentatge'][0:last_input_neuron]
     abs_connections_df= pd.DataFrame(abs_connections_dict) # Here it concatenates at every loop
     rel_connections_df= pd.DataFrame(rel_connections_dict) # Here it concatenates at every loop
     
@@ -1365,7 +1365,7 @@ if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Total-number-synapses_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
-    print('FIGURE: Box-plots comparing categories')
+    print('FIGURE: Itinial barplots: Synaptic contacts')
 plt.close(fig)
 
 
@@ -1425,7 +1425,7 @@ if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Total-number-presynaptic-neurons_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
-    print('FIGURE: Box-plots comparing categories')
+    print('FIGURE: Itinial barplots: Presynaptic neurons')
 plt.close(fig)
 
 ######################################## Total number of presynaptic cell types ##########################################
@@ -1485,7 +1485,7 @@ if save_figures:
     save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
     figure_title = f'\Total-number-presynaptic-types_{dataset_name}_{neuron_of_interest}.pdf'
     fig.savefig(save_path+figure_title)
-    print('FIGURE: Box-plots comparing categories')
+    print('FIGURE: Itinial barplots: Presynaptic types')
 plt.close(fig)
 
 
@@ -2640,6 +2640,7 @@ if not d_v_filter:
 ############################################### STACKED BAR - PLOTS ############################################
 ################################################################################################################
 ################################# Binary, absolute counts and rank together ####################################
+#Seb coding here
 
 #Figure
 fig, axs = plt.subplots(nrows =1, ncols = 3, figsize = (40*cm, 15*cm))
@@ -2651,7 +2652,7 @@ fig.tight_layout(pad=10) # Adding some space between subplots
 # Data
 _data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()#  filtering based on " presence_threshold"
 # Binning the data
-bin_width = 5
+bin_width = 3
 binned_data = np.floor(_data / bin_width) * bin_width
 # Setting limits and colors
 _vmin = min_desired_count
@@ -2665,11 +2666,12 @@ unique_values = np.unique(binned_data.T.values)
 colors = _palette[:len(unique_values)]
 # Calculate the value counts for each column
 value_counts = binned_data.apply(lambda x: x.value_counts())
+value_counts_norm = value_counts.apply(lambda x: (x / x.sum()), axis=0)
 # Plot the stacked bar chart
-value_counts.T.plot(kind='bar', stacked=True, color=colors, legend=False, figsize=(10, 20), ax = axs[0])
+value_counts_norm.T.plot(kind='bar', stacked=True, color=colors, legend=False, ax = axs[0])
 # Set the x-axis and y-axis labels
 axs[0].set_xlabel('Presynaptic neuron')
-axs[0].set_ylabel('Count of absolut counts')
+axs[0].set_ylabel('Absolute synapse number (% of counts)')
 # Set the x-axis tick labels
 axs[0].set_xticklabels(value_counts.T.index, rotation=90)
 # Set the plot title
@@ -2694,11 +2696,12 @@ _palette = sns.color_palette("tab20",n_colors=total_num_ranks)
 colors = _palette[:len(unique_values)]
 # Calculate the value counts for each column
 value_counts = _data.apply(lambda x: x.value_counts())
+value_counts_norm = value_counts.apply(lambda x: (x / x.sum()), axis=0)
 # Plot the stacked bar chart
-value_counts.T.plot(kind='bar', stacked=True, color=colors, legend=False, figsize=(10, 20), ax = axs[1])
+value_counts_norm.T.plot(kind='bar', stacked=True, color=colors, legend=False, ax = axs[1])
 # Set the x-axis and y-axis labels
 axs[1].set_xlabel('Presynaptic neuron')
-axs[1].set_ylabel('Rank counts')
+axs[1].set_ylabel('Rank (% of counts)')
 # Set the x-axis tick labels
 axs[1].set_xticklabels(value_counts.T.index, rotation=90)
 # Set the plot title
@@ -2720,7 +2723,7 @@ sorted_thr_rel_presence_absence_df.set_index('Presynaptic neuron').plot(kind='ba
 axs[2].set_title(f'{neuron_of_interest}, Presence above {int(presence_threshold*100)}%, syn>={min_desired_count}, sorted by {sort_by}')
 #axs[2].legend(bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
 axs[2].set_xlabel('Presynaptic neuron')
-axs[2].set_ylabel('% of columns')
+axs[2].set_ylabel('Presence (% of columns)')
 # Remove spines
 axs[2].spines['right'].set_visible(False)
 axs[2].spines['top'].set_visible(False)
@@ -3741,7 +3744,7 @@ _data = binary_df[presence_threshold_sorted_column_order] # FIlter abnd sorting
 
 #Gettting the center point in specific neuropile from database
 xyz_neuropil = 'XYZ-ME'
-xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
+xyz_df = database_df[database_df['Updated_seg_id'].isin(root_ids)].copy()
 xyz_pre = xyz_df[xyz_neuropil].tolist()
 # Split each string by comma and convert the elements to floats
 xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])
@@ -3913,7 +3916,7 @@ print(f"Plots saved in {outputPath}")
 
 #Gettting the center point in specific neuropile from database
 xyz_neuropil = 'XYZ-ME'
-xyz_df = database_df[database_df['seg_id'].isin(root_ids)].copy()
+xyz_df = database_df[database_df['Updated_seg_id'].isin(root_ids)].copy()
 xyz_pre = xyz_df[xyz_neuropil].tolist()
 # Split each string by comma and convert the elements to floats
 xyz_pre_arr = np.array([list(map(float, s.split(','))) for s in xyz_pre])

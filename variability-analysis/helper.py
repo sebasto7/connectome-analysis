@@ -141,8 +141,13 @@ def calculate_correlation_and_p_values(df):
         correlation_coefficient, p_value = pearsonr(x_data, y_data)
 
         # Store the absolute value of the correlation coefficient in the DataFrame
-        correlation_df.at[col1, col2] = abs(correlation_coefficient)
-        correlation_df.at[col2, col1] = abs(correlation_coefficient)
+
+        #Seb: Why and when is ti useful to take just the absolute value? 
+        #correlation_df.at[col1, col2] = abs(correlation_coefficient)
+        #correlation_df.at[col2, col1] = abs(correlation_coefficient)
+
+        correlation_df.at[col1, col2] = correlation_coefficient
+        correlation_df.at[col2, col1] = correlation_coefficient
 
         # Store the p-value in the DataFrame
         p_values_correlation_df.at[col1, col2] = round(p_value, 4)
