@@ -127,10 +127,43 @@ def permutation_test(cluster_df, dataset_df, column1_name, column2_name, num_per
 
     return observed_corr, p_value, shuffled_corrs
 
+# def calculate_correlation_and_p_values(df):
+#     # Initialize empty DataFrames for correlation and p-values
+#     correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
+#     p_values_correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
+
+#     # Calculate the correlation matrix using Pearson correlation
+#     for col1, col2 in combinations(df.columns, 2):
+#         # Get the data for the current pair of columns
+#         x_data, y_data = df[col1], df[col2]
+
+#         # Compute the Pearson correlation coefficient and p-value
+#         correlation_coefficient, p_value = pearsonr(x_data, y_data)
+
+#         # Store the absolute value of the correlation coefficient in the DataFrame
+
+#         #Seb: Why and when is ti useful to take just the absolute value? 
+#         #correlation_df.at[col1, col2] = abs(correlation_coefficient)
+#         #correlation_df.at[col2, col1] = abs(correlation_coefficient)
+
+#         correlation_df.at[col1, col2] = correlation_coefficient
+#         correlation_df.at[col2, col1] = correlation_coefficient
+
+#         # Store the p-value in the DataFrame
+#         p_values_correlation_df.at[col1, col2] = round(p_value, 4)
+#         p_values_correlation_df.at[col2, col1] = round(p_value, 4)
+
+#     # Fill the diagonal with 1.0 since the correlation of a feature with itself is always 1
+#     np.fill_diagonal(correlation_df.values, 1.0)
+
+    return correlation_df, p_values_correlation_df
+
 def calculate_correlation_and_p_values(df):
     # Initialize empty DataFrames for correlation and p-values
     correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
     p_values_correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
+
+    num_comparisons = len(list(combinations(df.columns, 2)))
 
     # Calculate the correlation matrix using Pearson correlation
     for col1, col2 in combinations(df.columns, 2):
@@ -141,19 +174,15 @@ def calculate_correlation_and_p_values(df):
         correlation_coefficient, p_value = pearsonr(x_data, y_data)
 
         # Store the absolute value of the correlation coefficient in the DataFrame
-
-        #Seb: Why and when is ti useful to take just the absolute value? 
-        #correlation_df.at[col1, col2] = abs(correlation_coefficient)
-        #correlation_df.at[col2, col1] = abs(correlation_coefficient)
-
         correlation_df.at[col1, col2] = correlation_coefficient
         correlation_df.at[col2, col1] = correlation_coefficient
 
-        # Store the p-value in the DataFrame
-        p_values_correlation_df.at[col1, col2] = round(p_value, 4)
-        p_values_correlation_df.at[col2, col1] = round(p_value, 4)
+        # Store the p-value adjusted with Bonferroni correction in the DataFrame
+        p_value_corrected = min(p_value * num_comparisons, 1.0)
+        p_values_correlation_df.at[col1, col2] = round(p_value_corrected, 4)
+        p_values_correlation_df.at[col2, col1] = round(p_value_corrected, 4)
 
-    # Fill the diagonal with 1.0 since the correlation of a feature with itself is always 1
+    # Fill the diagonal with 1.0 since the correlation of a variable with itself is always 1
     np.fill_diagonal(correlation_df.values, 1.0)
 
     return correlation_df, p_values_correlation_df
