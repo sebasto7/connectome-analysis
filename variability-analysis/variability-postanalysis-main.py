@@ -45,10 +45,10 @@ save_figures = True
 
 # Comparisons (between processed-data)
 single_data_set = True
-data_frames_to_compare_ls = ['Tm9_FAFB_L_R_'] # ['Tm9_FAFB_R_'], ['Tm9_FAFB_L_R_'], ['Tm9_FAFB_R_', 'Tm1_FAFB_R_','Tm2_FAFB_R_']
-user_defined_categoriers = ['Tm9_R'] # ['Tm9_R', 'Tm1_R', 'Tm2_R']
-dataset_subgroups = ['D', 'V'] # ['D', 'V'], ['R', 'L']
-subgroups_name = 'dorso-ventral' # 'dorso-ventral'
+data_frames_to_compare_ls = ['Tm9_300_healthy_L3_L_R_20230823'] # ['Tm9_FAFB_R_'], ['Tm9_FAFB_L_R_'], ['Tm9_FAFB_R_', 'Tm1_FAFB_R_','Tm2_FAFB_R_']
+user_defined_categoriers = ['Tm9_R'] # ['Tm9_R'] , ['Tm9_R', 'Tm1_R', 'Tm2_R']
+dataset_subgroups = ['R', 'L'] # ['D', 'V'], ['R', 'L']
+subgroups_name = 'dorso-ventral' # 'dorso-ventral', hemisphere
 
 
 excel_file_to_load = []
