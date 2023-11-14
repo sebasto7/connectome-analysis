@@ -64,7 +64,7 @@ cm = 1/2.54  # centimeters in inches
 #Sorting options for plots
 sort_by = 'mean_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%', 'mean_abs_count' (used in the Nature submission)
 #Choosing type of data for cosine similarity and cluster analysis
-relative_or_absolute = 'absolute-counts' # 'absolute-counts', 'relative-counts' 
+relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts' 
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
 category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
@@ -117,12 +117,12 @@ num_permutations = 1000
 _seed = 42 # For the random selection of Tm9-columns (rows in data frames) from the complete dataset
 
 #Data set 
-optic_lobe = 'L'  # 'L', 'R', 'L_R'
+optic_lobe = 'R'  # 'L', 'R', 'L_R'
 dataset_name = f'FAFB_{optic_lobe}_{selection_area}'
-mesh_ME = 'ME_R' # 'ME_R' , 'ME_L' 
-mesh_LO = 'LO_R' # 'LO_R' , 'LO_L'
-mesh_azim = -18# -18 for ME_R, 16 for ME_L
-mesh_elev = -148 # -148 for ME_R, -50 for ME_L
+mesh_ME = 'ME_L' # 'ME_R' , 'ME_L' 
+mesh_LO = 'LO_L' # 'LO_R' , 'LO_L'
+mesh_azim = 16# -18 for ME_R, 16 for ME_L
+mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 check_input_neuron = 'L3'
 check_input_weight = 10
@@ -143,8 +143,8 @@ save_clusters_txt = True
 
 #Path and file
 PC_disc = 'D'
-dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets\submission_nature'# '~\Connectomics-Data\FlyWire\Excels\drive-data-sets' ,'~\Connectomics-Data\FlyWire\Excels\drive-data-sets\submission_nature',
-fileDate = '20230823' # 20230823, 490_20231109, 700_20231111
+dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets'# '~\Connectomics-Data\FlyWire\Excels\drive-data-sets' ,'~\Connectomics-Data\FlyWire\Excels\drive-data-sets\submission_nature',
+fileDate = '700_20231113' # 20230823, 490_20231109, 700_20231111
 fileName = f'{neuron_of_interest}_neurons_input_count_{optic_lobe}_{fileDate}.xlsx'
 #fileName = f'Tm9_neurons_input_count_L_R_OA_subtypes_20230718.xlsx' # Remove this line after OA plots are done
 fileName_database = f'{neuron_of_interest} proofreadings_{fileDate}.xlsx'
@@ -157,7 +157,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_150_healthy_L3_{optic_lobe}.txt' # Tm9_300_healthy_L3_{optic_lobe}.txt, Tm9_490_healthy_L3_over_10_{optic_lobe}.txt, 'Tm9_490_{optic_lobe}.txt', 'Tm9_700_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_700_unhealthy_L3_below_10_{optic_lobe}.txt' # Tm9_300_healthy_L3_{optic_lobe}.txt, Tm9_490_healthy_L3_over_10_{optic_lobe}.txt, 'Tm9_490_{optic_lobe}.txt', 'Tm9_700_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 
 # Healthy columns based on lamina detachement and damage L3s
