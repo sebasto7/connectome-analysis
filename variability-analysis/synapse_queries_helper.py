@@ -128,7 +128,7 @@ def synapse_count(pre_df, post_df):
     return count_pre_str_df, count_post_str_df, total_synapse_count_df
 
 
-import math
+
 
 def calculate_distance(point1, point2):
     """
@@ -141,6 +141,7 @@ def calculate_distance(point1, point2):
     Returns:
         float: The Euclidean distance between the two points in nanometers.
     """
+    import math
     
     resolution_x = 4  # nm
     resolution_y = 4  # nm
@@ -207,7 +208,7 @@ def filter_points(points, threshold_distance):
     return filtered_points
 
 
-import math
+
 
 def calculate_distance_nearest_neighbour(points, lower_threshold, upper_threshold):
     """
@@ -222,6 +223,9 @@ def calculate_distance_nearest_neighbour(points, lower_threshold, upper_threshol
     Returns:
         list: A list of distances within the specified threshold values.
     """
+    
+    import math
+    
     resolution_x = 4  # nm
     resolution_y = 4  # nm
     resolution_z = 40  # nm
@@ -265,3 +269,200 @@ def calculate_distance_nearest_neighbour(points, lower_threshold, upper_threshol
             distances.append(nearest_distance)
 
     return distances
+
+
+def calculate_neuron_weights(pre_post_counts, post_inputs, up_to_date_pre_ids, min_desired_count):
+    # Synaptic counts filter
+    pre_post_counts = pre_post_counts[pre_post_counts['pre_syn_count'] >= min_desired_count].copy()
+
+    # Getting all input counts for each presynaptic neuron id
+    post_inputs_counts = post_inputs.groupby(['post_pt_root_id', 'pre_pt_root_id'])['pre_pt_root_id'].count().reset_index(name='pre_syn_count')
+
+    # Initializing variables
+    rel_neuron_type_weight = []
+    rel_neuron_weight = []
+    neuron_weight_post_ls = []
+    neuron_weight_pre_ls = []
+
+    # Looping to get the neuron and neuron type weights for each postsynaptic partner
+    for _post in list(set(post_inputs_counts['post_pt_root_id'].tolist())):
+        curr_df = post_inputs_counts[post_inputs_counts['post_pt_root_id'] == _post].copy()
+        curr_total_syn_count = curr_df['pre_syn_count'].sum()
+        curr_pre_type_df = curr_df[curr_df['pre_pt_root_id'].isin(up_to_date_pre_ids)].copy()
+
+        # Weight for all cells of the same type
+        curr_rel_neuron_type_weight = curr_pre_type_df['pre_syn_count'].sum() / curr_total_syn_count
+        rel_neuron_type_weight.append(curr_rel_neuron_type_weight)
+
+        # Weight for individual cells of the same type
+        if len(curr_pre_type_df['pre_pt_root_id']) == 0:
+            rel_neuron_weight.append(0.0)
+            neuron_weight_post_ls.append(_post)  # Tracking the postsynaptic neuron ids
+            neuron_weight_pre_ls.append('-')  # Tracking the presynaptic neuron ids
+        else:
+            for _pre in list(set(curr_pre_type_df['pre_pt_root_id'].tolist())):
+                neuron_weight_post_ls.append(_post)  # Tracking the postsynaptic neuron ids
+                neuron_weight_pre_ls.append(_pre)  # Tracking the presynaptic neuron ids
+                curr_rel_neuron_weight = curr_pre_type_df[curr_pre_type_df['pre_pt_root_id'] == _pre]['pre_syn_count'].sum() / curr_total_syn_count
+                rel_neuron_weight.append(curr_rel_neuron_weight)
+
+    # Summary data frames
+    neuron_weight_df = pd.DataFrame()
+    neuron_weight_df['rel_weight'] = rel_neuron_weight
+    neuron_weight_df['post'] = neuron_weight_post_ls
+    neuron_weight_df['pre'] = neuron_weight_pre_ls
+
+    return neuron_weight_df, rel_neuron_type_weight
+
+
+
+
+def match_all_pre_to_single_post(up_to_date_post_ids, up_to_date_pre_ids, neuropile_mesh):
+    
+    from fafbseg import flywire
+    
+    # Fetch the neuron's inputs
+    post_inputs = flywire.synapses.fetch_synapses(
+        up_to_date_post_ids, pre=False, post=True, attach=True,
+        min_score=50, clean=True, transmitters=False,
+        neuropils=True, batch_size=30,
+        dataset='production', progress=True, mat="live"
+    )
+
+    # Combining pre- and postsynapses XYZ values in single columns
+    combine_xyz(post_inputs)  # Assuming combine_xyz is a defined function that does the operation
+
+    # Filtering: keeping only synapses in the medulla
+    post_inputs = post_inputs[post_inputs['neuropil'] == neuropile_mesh].copy()
+
+    # Filter connections just selected presynaptic cells
+    pre_post_match_df = post_inputs[post_inputs['pre_pt_root_id'].isin(up_to_date_pre_ids)].copy()
+
+    # Aggregating data frame based on unique post and pre segment IDs
+    # While aggregating, counting the number of contacts for each pre-post pair
+    pre_post_counts = pre_post_match_df.groupby(['post_pt_root_id', 'pre_pt_root_id'])['pre_pt_root_id'].count().reset_index(name='pre_syn_count')
+
+
+    return pre_post_counts, post_inputs
+
+
+
+
+def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_update_df, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area):
+    """
+    Calculates the TOTAL spatial span of all presynaptic neurons in the list that together contact the same postsynaptic neuron,
+    for a list of postsynaptic neurons
+    """
+    
+    import pandas as pd
+    import numpy as np
+    from scipy.spatial import ConvexHull
+    from scipy import stats
+    
+    pre_post_volumes = []
+    pre_post_areas = []
+    pre_count = []
+    pre_xzy_ls = []
+    post_xzy_ls = []
+    pre_center_ls = []
+    num_pre_sites = []
+    hull_ls = []
+
+    for i in range(0, len(up_to_date_post_ids)):
+        curr_post = up_to_date_post_ids[i]
+
+        # Getting single postynaptic cell's coordinates
+        try:
+            old_curr_post = update_df[update_df['new_id'] == curr_post]['old_id'].tolist()[0]
+        except:
+            old_curr_post = str(curr_post)
+
+        single_post_coords = R_post_df[R_post_df['Updated_seg_id'] == old_curr_post]['XYZ-ME'].to_numpy(dtype=str, copy=True)
+        post_xyz = np.zeros([np.shape(single_post_coords)[0], 3])
+        new_post_coords = np.zeros([np.shape(single_post_coords)[0], 3])
+
+        for idx, coordinate in enumerate(single_post_coords):
+            post_xyz[idx, :] = np.array([coordinate.split(',')], dtype=float)
+            new_post_coords[idx, :] = np.array([coordinate.split(',')], dtype=float)
+
+        post_xyz *= [4, 4, 40]  # For plotting it using navis (correcting for data resolution)
+        post_xzy_ls.append(post_xyz)
+
+        # Getting presynaptic cells coordinates based on postsynaptic location
+        curr_post_inputs = post_inputs[post_inputs['post_pt_root_id'] == curr_post].copy()
+
+        # Getting presynaptic cells coordinates based on postsynaptic location
+        curr_pre_ls = pre_post_counts[pre_post_counts['post_pt_root_id'] == curr_post]['pre_pt_root_id'].tolist()
+        curr_pre_inputs = pre_inputs[pre_inputs['post_pt_root_id'].isin(curr_pre_ls)].copy()
+
+        if len(curr_pre_inputs) < 10:
+            pre_post_volumes.append(None)
+            pre_post_areas.append(None)
+            pre_count.append(None)
+            pre_xzy_ls.append(None)
+            pre_center_ls.append(None)
+            num_pre_sites.append(None)
+            hull_ls.append(None)
+        else:
+            pre_count.append(len(curr_pre_ls))
+
+            # Getting presynaptic cells coordinates
+            temp_pre_coords = curr_pre_inputs['pre_pt_position'].tolist()
+
+            # Correcting xyz positions for mesh plotting
+            pre_xyz = np.array([list(np.array(l) * [4, 4, 40]) for l in temp_pre_coords])
+            pre_xzy_ls.append(pre_xyz)
+            num_pre_sites.append(len(pre_xyz))  # Total number of points in the presynaptic partner(s)
+
+            # Calculate the center of the cloud of points
+            pre_center = np.mean(pre_xyz, axis=0)
+            pre_center_ls.append(pre_center)
+
+            # Calculate the volume of the cloud using the convex hull method
+            hull = ConvexHull(pre_xyz)
+            volume = hull.volume
+            pre_post_volumes.append(volume)
+
+            # Calculate volume/area based on projections using PCA on presynaptic partner coordinates
+            # PCA to get an approximate area of the volume
+            pre_mean = np.mean(pre_xyz, axis=0)
+            pre_centered_points = pre_xyz - pre_mean
+            pre_cov_matrix = np.cov(pre_centered_points, rowvar=False)
+            pre_eigenvalues, pre_eigenvectors = np.linalg.eigh(pre_cov_matrix)
+            pre_normal_vector = pre_eigenvectors[:, [1, 2]]  # PC2 and PC3
+
+            # Calculate volume/area based on projections using PCA on postsynaptic partner coordinates
+            temp_post_coords = curr_post_inputs['pre_pt_position'].tolist()
+            post_xyz = np.array([list(np.array(l) * [4, 4, 40]) for l in temp_post_coords])
+            post_mean = np.mean(post_xyz, axis=0)
+            post_centered_points = post_xyz - post_mean
+            post_cov_matrix = np.cov(post_centered_points, rowvar=False)
+            post_eigenvalues, post_eigenvectors = np.linalg.eigh(post_cov_matrix)
+            post_normal_vector = post_eigenvectors[:, [0, 1]]  # PC1 and PC2
+
+            # Project the points
+            projected_points = pre_centered_points.dot(post_normal_vector)
+
+            # Calculate area
+            hull = ConvexHull(projected_points)
+            hull_ls.append(hull)
+            area = hull.volume  # Area is calculated as volume in 2D
+            area_um2 = area / 10**6
+            pre_post_areas.append(area_um2)
+
+    # Summary data frame
+    spatial_span_df = pd.DataFrame()
+    spatial_span_df['bodyId_post'] = up_to_date_post_ids
+    spatial_span_df['Volume'] = pre_post_volumes
+    spatial_span_df['Area'] = pre_post_areas
+    spatial_span_df['Hull'] = hull_ls
+    spatial_span_df['Pre_count'] = pre_count
+    spatial_span_df['Pre_xyz'] = pre_xzy_ls
+    spatial_span_df['Pre_center'] = pre_center_ls
+    spatial_span_df['Post_xyz'] = post_xzy_ls
+    spatial_span_df.set_index('bodyId_post', inplace=True)
+    spatial_span_df['Area_zscore'] = (spatial_span_df['Area'] - spatial_span_df['Area'].mean()) / spatial_span_df['Area'].std()
+    spatial_span_df['Num_pre_sites'] = num_pre_sites
+    spatial_span_df['Num_columns'] = [round(area / single_column_area) if area is not None else None for area in pre_post_areas]
+
+    return spatial_span_df
