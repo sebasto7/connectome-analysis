@@ -125,7 +125,7 @@ mesh_azim = 16# -18 for ME_R, 16 for ME_L
 mesh_elev = -50 # -148 for ME_R, -50 for ME_L
 neuron_of_interest = 'Tm9' 
 check_input_neuron = 'L3'
-check_input_weight = 10
+check_input_min_weight = 30
 instance_id_column = 'optic_lobe_id' # 'optic_lobe_id', 'column_id'
 
 ##
@@ -157,7 +157,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_700_unhealthy_L3_below_10_{optic_lobe}.txt' # Tm9_300_healthy_L3_{optic_lobe}.txt, Tm9_490_healthy_L3_over_10_{optic_lobe}.txt, 'Tm9_490_{optic_lobe}.txt', 'Tm9_700_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_700_healthy_L3_over_30_{optic_lobe}.txt' # Tm9_300_healthy_L3_{optic_lobe}.txt, Tm9_490_healthy_L3_over_10_{optic_lobe}.txt, 'Tm9_490_{optic_lobe}.txt', 'Tm9_700_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 
 # Healthy columns based on lamina detachement and damage L3s
@@ -322,8 +322,21 @@ print(f'\nInitial coverage (%) for syn >= 1: {coverage}')
 print(f'\nInitial coverage (%) for syn >= {min_desired_count}: {initial_coverage}')
 print(f'\nFinal coverage (%) after dropping N.I. for syn >= {min_desired_count}: {final_coverage}\n') 
 print(last_percent_with_desired_count)
-columns_wiht_X_neuron_iput = df[(df['type_pre'] == check_input_neuron) & (df['W_new'] > check_input_weight)]['optic_lobe_id'].unique().tolist()
-print(f"Columns with L3 as input neuron: {len(columns_wiht_X_neuron_iput)} out of {len(id_column)} \n {columns_wiht_X_neuron_iput}")
+columns_wiht_X_neuron_iput = df[(df['type_pre'] == check_input_neuron) & (df['W_new'] > check_input_min_weight)]['optic_lobe_id'].unique().tolist()
+print(f"Columns with L3 as input neuron (syn > {check_input_min_weight}): {len(columns_wiht_X_neuron_iput)} out of {len(id_column)} \n {columns_wiht_X_neuron_iput}")
+
+## For modifying an excel file in a particular way 
+# with open('D:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids\Tm9_700_healthy_L3_over_30_R.txt', 'r') as file:
+#     content = file.read()
+
+# # Replace the characters as needed
+# content = content.replace("', '", "\n").replace("'", "")
+
+# # Save the modified content to a new file
+# with open('D:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids\Tm9_700_healthy_L3_over_30_R_updated.txt', 'w') as new_file:
+#     new_file.write(content)
+
+
 
 #%% 
 ################################################## PRE-ANALYSIS ###############################################
@@ -2412,7 +2425,42 @@ if plot_data:
         figure_title = f'\Rank-heatmap_{dataset_name}_{neuron_of_interest}_{sort_by}-horizontal.pdf'
         fig.savefig(save_path+figure_title)
         print('FIGURE: Visualization of ranks plotted horizontally and saved')
+
     plt.close(fig)
+
+
+    #####################################        HISTOGRAMS PLOTS      ###############################################
+    # Aim: evaluate if there are unexpected subpopulations
+
+    _data = top_rank_popularity_abs_df[presence_threshold_sorted_column_order].copy()
+    _data.fillna(0, inplace=True)
+
+    # Define the number of subplots
+    num_subplots = 3
+    fig, axs = plt.subplots(num_subplots,2, figsize=(8, 6 * num_subplots))
+    fig.suptitle('Count distribution')
+
+    # Loop through the columns and create subplots
+    for i in range(num_subplots):
+        # Plot histogram
+        sns.histplot(data=_data.iloc[:, i], kde=True, binwidth=3, ax=axs[i,0])
+        axs[i,0].set_title('Absolute counts')
+
+    _data = top_rank_popularity_rel_df[presence_threshold_sorted_column_order].copy()
+    _data.fillna(0, inplace=True)
+
+    # Loop through the columns and create subplots
+    for i in range(num_subplots):
+        # Plot histogram
+        sns.histplot(data=_data.iloc[:, i], kde=True, binwidth=3, ax=axs[i,1])
+        axs[i,1].set_title('Relative counts')
+
+
+    if save_figures:
+        save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
+        figure_title = f'\Count-histograms-main-inputs.pdf'
+        fig.savefig(save_path+figure_title)
+        print('FIGURE: Counts histogram plotted and saved')
 
     ####################################### NEUROTRANSMITTER IDENTITY PLOTS ##########################################
     # Visualization of neurotranmitter identity for all columns

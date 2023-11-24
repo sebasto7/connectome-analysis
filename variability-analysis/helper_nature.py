@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Mon June 12 14:43:16 2023
 
-@author: smolina
+Helper file cotaining custom functions
+Clean code for publication
 
-helper file cotaining custom functions
+@author: Sebastian Molina-Obando
 """
 
 #%% 
@@ -15,8 +15,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, levene
 from itertools import combinations
 import math
-from caveclient import CAVEclient
-client = CAVEclient('flywire_fafb_production')
 
 #%% 
 #Functions
@@ -216,36 +214,3 @@ def cosine_similarity_and_clustering(_data,cosine_subgroups):
                                           columns=_data_reordered_cosine_sim.index)
 
     return cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered, cos_sim_medians
-
-
-
-# def calculate_correlation_and_p_values(df):
-#     # Initialize empty DataFrames for correlation and p-values
-#     correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
-#     p_values_correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
-
-#     # Calculate the correlation matrix using Pearson correlation
-#     for col1, col2 in combinations(df.columns, 2):
-#         # Get the data for the current pair of columns
-#         x_data, y_data = df[col1], df[col2]
-
-#         # Compute the Pearson correlation coefficient and p-value
-#         correlation_coefficient, p_value = pearsonr(x_data, y_data)
-
-#         # Store the absolute value of the correlation coefficient in the DataFrame
-
-#         #Seb: Why and when is ti useful to take just the absolute value? 
-#         #correlation_df.at[col1, col2] = abs(correlation_coefficient)
-#         #correlation_df.at[col2, col1] = abs(correlation_coefficient)
-
-#         correlation_df.at[col1, col2] = correlation_coefficient
-#         correlation_df.at[col2, col1] = correlation_coefficient
-
-#         # Store the p-value in the DataFrame
-#         p_values_correlation_df.at[col1, col2] = round(p_value, 4)
-#         p_values_correlation_df.at[col2, col1] = round(p_value, 4)
-
-#     # Fill the diagonal with 1.0 since the correlation of a feature with itself is always 1
-#     np.fill_diagonal(correlation_df.values, 1.0)
-
-#   return correlation_df, p_values_correlation_df

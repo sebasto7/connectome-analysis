@@ -10,14 +10,12 @@ variability postanalysis of presynaptic inputs
 import os
 import pandas as pd
 import glob
-
-
 import pandas as pd
 import numpy as np
 from scipy.stats import shapiro, f_oneway
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
 from scipy import stats
-from scipy.stats import kruskal
+from scipy.stats import kruskal, bartlett
 from scikit_posthocs import posthoc_dunn
 from itertools import combinations
 import matplotlib.pyplot as plt
@@ -25,7 +23,7 @@ import seaborn as sns
 
 
 #Importing custom functions from helper file
-from helper import cosine_similarity_and_clustering
+from helper import cosine_similarity_and_clustering, remove_outliers, perform_levene_test, determine_subgroup
 
 #%% Custom functions 
 #TODO load this functions from a helper file at some point
@@ -39,15 +37,18 @@ from helper import cosine_similarity_and_clustering
 
 # Specify the folder containing files (processed-data)
 PC_disc = 'D'
-dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'
+dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data' # Path to the PROCESSED_DATA folder
+fig_save_path = os.path.join(dataPath,"Figures")
 save_figures = True
+exclude_outliers = False
 
 
 # Comparisons (between processed-data)
-single_data_set = True
-data_frames_to_compare_ls = ['Tm9_300_healthy_L3_L_R_20230823'] # ['Tm9_FAFB_R_'], ['Tm9_FAFB_L_R_'], ['Tm9_FAFB_R_', 'Tm1_FAFB_R_','Tm2_FAFB_R_']
-user_defined_categoriers = ['Tm9_R'] # ['Tm9_R'] , ['Tm9_R', 'Tm1_R', 'Tm2_R']
+single_data_set = False # True, False
+data_frames_to_compare_ls = ['Tm9_FAFB_R_', 'Tm1_FAFB_R_','Tm2_FAFB_R_'] # ['Tm9_300_healthy_L3_L_R_20230823'], ['Tm9_FAFB_R_'], ['Tm9_FAFB_L_R_'], ['Tm9_FAFB_R_', 'Tm1_FAFB_R_','Tm2_FAFB_R_']
+user_defined_categoriers = ['Tm9_R', 'Tm1_R', 'Tm2_R'] # ['Tm9_R'] , ['Tm9_R', 'Tm1_R', 'Tm2_R']
 dataset_subgroups = ['R', 'L'] # ['D', 'V'], ['R', 'L']
+dataset = ['FAFB_R_L'] # ['FAFB_R_L']
 subgroups_name = 'dorso-ventral' # 'dorso-ventral', hemisphere
 
 
@@ -94,8 +95,30 @@ for excel_file in excel_file_to_load:
 ############################################### DATA ANALYSIS #################################################
 ###############################################################################################################
 
-##################################    Cosine similarity in absolute counts    #################################
 
+############################################# Synapse count variation #########################################
+
+## Synapse count distributions for ABSOLUTE COUNTS
+
+# Initialize an empty DataFrame
+syn_count_df = pd.DataFrame()
+
+# Find the maximum length among all lists
+max_length = max(len(_data) for _data in data_frames.values())
+
+# Iterate over each DataFrame
+for i, df_name in enumerate(data_frames_to_compare_ls):
+    df_name = df_name + '_Absolut_counts'
+    _data = data_frames[df_name]
+    
+    # Sum all columns along the rows to get 'total_count'
+    _data['total_count'] = _data.sum(axis=1)
+    
+    # Add a new column with NaN values if the length is less than the maximum length
+    syn_count_df[user_defined_categoriers[i]] = _data['total_count'].tolist() + [np.nan] * (max_length - len(_data['total_count']))
+
+
+# ##################################    Cosine similarity in absolute counts    #################################
 
 ## For multiple data sets
 # Computing cosine similarity for absolute counts
@@ -135,13 +158,6 @@ if single_data_set:
 ############################################    Relative counts    #########################################
 
 
-def determine_subgroup(index, dataset_subgroups):
-    for subgroup in dataset_subgroups:
-        if subgroup in index:
-            return subgroup
-    return None
-
-
 ## For single data set
 if single_data_set:
     rel_df = data_frames[data_frames_to_compare_ls[0]+'_Relative_counts']
@@ -155,6 +171,84 @@ if single_data_set:
 #%% 
 ############################################ PLOTS and STATISTICS #############################################
 ###############################################################################################################
+
+
+########################################### Synapse count variability ########################################
+##############################    Leven test for equality of variances    ####################################
+
+
+
+# Plotting
+# Plot box plots and histograms in two subplots
+_binwidth = 6
+# Removing outliers
+if exclude_outliers:
+    syn_count_df = remove_outliers(syn_count_df, multiplier=1.5)
+
+# Calculate the coefficient of variation (CV) for each column
+cv_values = syn_count_df.std() / syn_count_df.mean()
+
+# Perform F-test for equality of variances
+f_test_results = f_oneway(*[syn_count_df[col].dropna() for col in syn_count_df.columns])
+
+# Perform Bartlett's test for equality of variances
+bartlett_test_results = bartlett(*[syn_count_df[col].dropna() for col in syn_count_df.columns])
+
+# Perform Levene's test for equality of variances pairwise with Bonferroni correction
+column_combinations = list(combinations(syn_count_df.columns, 2))
+alpha = 0.05  # Set your desired significance level
+
+# Create subplots for box plots and histograms
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+# Box plots with the same colors used in histograms
+sns.boxplot(data=syn_count_df, ax=axes[0], palette=sns.color_palette('husl', n_colors=len(syn_count_df.columns)))
+axes[0].set_title("Synapse count variability (Levene's Test)")
+axes[0].set_ylabel('Synapse counts')
+
+# Add CV values to the box plots
+for i, col in enumerate(syn_count_df.columns):
+    axes[0].text(i, syn_count_df[col].max() + 10, f'CV={cv_values[col]:.2f}', ha='center', va='bottom', color='blue')
+
+# Plot horizontal lines with p-values
+for i, (col1, col2) in enumerate(column_combinations):
+    p_value = perform_levene_test(syn_count_df[col1], syn_count_df[col2],column_combinations)
+
+    print(f"Levene's Test for {col1} and {col2} p-value (Bonferroni corrected): {p_value:.4f}")
+    print("Significant" if p_value < alpha else "Not significant")
+
+    # Extract x-axis tick locations for each column
+    ticks = axes[0].get_xticks()
+    
+    # Find the index of the current columns in the list of ticks
+    index_col1 = syn_count_df.columns.get_loc(col1)
+    index_col2 = syn_count_df.columns.get_loc(col2)
+    
+    # Calculate the center positions based on the tick locations
+    center1 = ticks[index_col1]
+    center2 = ticks[index_col2] 
+    
+    y_position = max(syn_count_df[col1].max(), syn_count_df[col2].max()) + 20
+    
+    # Plot horizontal lines from one boxplot center to the other
+    axes[0].hlines(y=y_position, xmin=center1, xmax=center2, color='red', linewidth=2)
+    axes[0].text((center1 + center2) / 2, y_position + 2, f'p={p_value:.4f}', ha='center', va='bottom', color='red')
+
+# Histograms for each column without outliers using Seaborn with the same colors
+for col_idx, (col, color) in enumerate(zip(syn_count_df.columns, sns.color_palette('husl', n_colors=len(syn_count_df.columns)))):
+    sns.histplot(data=syn_count_df[col], binwidth=_binwidth, alpha=0.5, ax=axes[1], kde=True, label=col, color=color)
+
+axes[1].set_title('Synapse count variability')
+axes[1].set_xlabel('Synapse counts')
+axes[1].set_ylabel('Frequency')
+axes[1].legend()
+
+# Save the figure if required
+if save_figures:
+    figure_title = '\Synaptic_count_variability_no_ouliers.pdf'
+    plt.savefig(fig_save_path + figure_title)
+
+
 
 
 ############################################    Cosine similarity     #########################################
@@ -233,7 +327,8 @@ plt.ylim(plt.ylim()[0], max(line_positions.values()) + line_distance)
 
 plt.show()
 
-
+if save_figures:
+    plt.savefig(f'{fig_save_path}\Cosine_similarity_{dataset}_abs_count.pdf')
 
 ############################################    Relative counts    #########################################
 
@@ -328,5 +423,8 @@ p_values_df['p_value'] = p_values_list
 print(f'Significant difference between {subgroups_name}')
 print(p_values_df[p_values_df["p_value"]<0.05])
 
+if save_figures:
+    figure_title = f'\Testing_violin_plots.pdf'
+    fig.savefig(fig_save_path+figure_title)
 
 print('Coding here')
