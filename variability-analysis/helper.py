@@ -187,7 +187,7 @@ def cosine_similarity_and_clustering(_data,cosine_subgroups):
     _data.fillna(0, inplace=True)  # Filling the remaining absent connectivity with a meaningful zero
 
     # Calculate cosine similarity
-    cosine_sim = cosine_similarity(_data.values)
+    cosine_sim = cosine_similarity(_data)
     cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
 
 
@@ -197,7 +197,10 @@ def cosine_similarity_and_clustering(_data,cosine_subgroups):
 
     cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere','neuron'],
                                          index=_data.index.tolist())
-    cosine_sim_nan = np.where(cosine_sim == 1., np.nan, cosine_sim)
+
+    
+    cosine_sim_nan = cosine_sim.copy()
+    np.fill_diagonal(cosine_sim_nan , np.nan, wrap=True) # Getting rid of column comparisons to itself (values in diagonal)
     cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2) # pulling values together for each postsynaptic neuron
     cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
     cosine_sim_summary_df['hemisphere'] = hemisphere_list

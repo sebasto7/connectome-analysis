@@ -1786,7 +1786,7 @@ if plot_data:
         if save_figures:
             # Quick plot saving
             save_path = f'{PC_disc}:\Connectomics-Data\FlyWire\Pdf-plots' #r'D:\Connectomics-Data\FlyWire\Pdf-plots' 
-            figure_title = f'\Counts-and-similarity-in_{dataset_name}_{neuron_of_interest}_by_{category_column}.pdf'
+            figure_title = f'\Counts-and-similarity-in_{dataset_name}_{neuron_of_interest}_by_{category_column}_{relative_or_absolute}.pdf'
             fig.savefig(save_path+figure_title)
             print('FIGURE: Box-plots comparing categories')
         plt.close(fig)

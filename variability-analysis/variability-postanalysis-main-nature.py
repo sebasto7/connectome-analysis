@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Created on Friday 25 16:40:16 2023
+Variability postanalysis of presynaptic inputs
+Clean code for publication
 
-@author: smolina
-
-variability postanalysis of presynaptic inputs
+@author: Sebastian Molina-Obando
 """
 #%% Importing packages
 import os
@@ -29,11 +28,11 @@ from sklearn.cluster import AgglomerativeClustering
 from fafbseg import flywire
 import navis
 
-
 #%% Custom functions 
 
 #Importing custom functions from helper file
-from helper import cosine_similarity_and_clustering, remove_outliers, perform_levene_test, determine_subgroup
+from helper_nature import cosine_similarity_and_clustering, remove_outliers, perform_levene_test, determine_subgroup
+
 
 
 #%% 
@@ -113,54 +112,7 @@ for excel_file in excel_file_to_load:
 ###############################################################################################################
 
 
-############################################# Synapse count variation #########################################
-
-## Synapse count distributions for the chosen _sheet
-
-# Initialize an empty DataFrame
-syn_count_df = pd.DataFrame()
-
-# For single data frames
-if single_data_set:
-    subgroups_data_frames = {}
-
-    # Loop through each letter and create a DataFrame for that letter
-    for letter in dataset_subgroups:
-        subgroups_data_frames[letter] = sheet_df[sheet_df.index.str.contains(letter)]
-    
-    # Find the maximum length among all lists
-    max_length = max(len(_data) for _data in subgroups_data_frames.values())
-
-    # Iterate over each DataFrame
-    for i, df_name in enumerate(dataset_subgroups):
-        _data = subgroups_data_frames[df_name]
-        
-        # Sum all columns along the rows to get 'total_count'
-        _total_count = _data.sum(axis=1).tolist()
-        
-        # Add a new column with NaN values if the length is less than the maximum length
-        syn_count_df[dataset_subgroups[i]] = _total_count + [np.nan] * (max_length - len(_total_count))
-
-# For many data frames
-else: 
-
-    # Find the maximum length among all lists
-    max_length = max(len(_data) for _data in data_frames.values())
-
-    # Iterate over each DataFrame
-    for i, df_name in enumerate(data_frames_to_compare_ls):
-        df_name = df_name + _sheet
-        _data = data_frames[df_name]
-        
-        # Sum all columns along the rows to get 'total_count'
-        _total_count = _data.sum(axis=1).tolist()
-        
-        # Add a new column with NaN values if the length is less than the maximum length
-        syn_count_df[user_defined_categoriers[i]] = _total_count + [np.nan] * (max_length - len(_total_count))
-
-
-
-# ##################################    Cosine similarity in absolute counts    #################################
+###################################    Cosine similarity in absolute counts    #################################
 
 ## For multiple data sets
 # Computing cosine similarity for absolute counts
@@ -318,85 +270,6 @@ eigvecs = eigvecs[:,k]
 ###############################################################################################################
 
 
-########################################### Synapse count variability ########################################
-##############################    Leven test for equality of variances    ####################################
-
-
-
-# Plotting
-# Plot box plots and histograms in two subplots
-_binwidth = 6
-# Removing outliers
-if exclude_outliers:
-    syn_count_df = remove_outliers(syn_count_df, multiplier=1.5)
-
-# Calculate the coefficient of variation (CV) for each column
-cv_values = syn_count_df.std() / syn_count_df.mean()
-
-# Perform F-test for equality of variances
-f_test_results = f_oneway(*[syn_count_df[col].dropna() for col in syn_count_df.columns])
-
-# Perform Bartlett's test for equality of variances
-bartlett_test_results = bartlett(*[syn_count_df[col].dropna() for col in syn_count_df.columns])
-
-# Perform Levene's test for equality of variances pairwise with Bonferroni correction
-column_combinations = list(combinations(syn_count_df.columns, 2))
-alpha = 0.05  # Set your desired significance level
-
-# Create subplots for box plots and histograms
-fig, axes = plt.subplots(1, 2, figsize=(16, 6))
-
-# Box plots with the same colors used in histograms
-sns.boxplot(data=syn_count_df, ax=axes[0], palette=sns.color_palette('husl', n_colors=len(syn_count_df.columns)))
-axes[0].set_title("Synapse count variability (Levene's Test)")
-axes[0].set_ylabel('Synapse counts')
-
-# Add CV values to the box plots
-for i, col in enumerate(syn_count_df.columns):
-    axes[0].text(i, syn_count_df[col].max() + 10, f'CV={cv_values[col]:.2f}', ha='center', va='bottom', color='blue')
-
-# Plot horizontal lines with p-values
-for i, (col1, col2) in enumerate(column_combinations):
-    p_value = perform_levene_test(syn_count_df[col1], syn_count_df[col2],column_combinations)
-
-    print(f"Levene's Test for {col1} and {col2} p-value (Bonferroni corrected): {p_value:.4f}")
-    print("Significant" if p_value < alpha else "Not significant")
-
-    # Extract x-axis tick locations for each column
-    ticks = axes[0].get_xticks()
-    
-    # Find the index of the current columns in the list of ticks
-    index_col1 = syn_count_df.columns.get_loc(col1)
-    index_col2 = syn_count_df.columns.get_loc(col2)
-    
-    # Calculate the center positions based on the tick locations
-    center1 = ticks[index_col1]
-    center2 = ticks[index_col2] 
-    
-    y_position = max(syn_count_df[col1].max(), syn_count_df[col2].max()) + 20
-    
-    # Plot horizontal lines from one boxplot center to the other
-    axes[0].hlines(y=y_position, xmin=center1, xmax=center2, color='red', linewidth=2)
-    axes[0].text((center1 + center2) / 2, y_position + 2, f'p={p_value:.4f}', ha='center', va='bottom', color='red')
-
-# Histograms for each column without outliers using Seaborn with the same colors
-for col_idx, (col, color) in enumerate(zip(syn_count_df.columns, sns.color_palette('husl', n_colors=len(syn_count_df.columns)))):
-    sns.histplot(data=syn_count_df[col], binwidth=_binwidth, alpha=0.5, ax=axes[1], kde=True, label=col, color=color)
-
-axes[1].set_title('Synapse count variability')
-axes[1].set_xlabel('Synapse counts')
-axes[1].set_ylabel('Frequency')
-axes[1].legend()
-
-# Save the figure if required
-if save_figures:
-    figure_title = f'\Synaptic_count_variability_no_ouliers_{user_defined_categoriers}{_sheet}.pdf'
-    plt.savefig(fig_save_path + figure_title)
-    plt.close()
-
-
-
-
 ############################################    Cosine similarity     #########################################
 ###########################################    Multiple Comparisons    ########################################
 
@@ -475,101 +348,6 @@ if save_figures:
     plt.savefig(f'{fig_save_path}\Cosine_similarity_{user_defined_categoriers}{_sheet}.pdf')
     plt.close()
 
-########################################    Counts for single data frames    #####################################
-##Plotting:
-if single_data_set:
-
-    # Filter out the "dorso-ventral" column
-    data_cols = sheet_df .columns[:-1]
-
-    # Create a figure and axes
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    # Initialize a list to store violin plot data
-    violin_plot_data = []
-
-    # Create an offset for the dodge effect
-    offset = 0
-
-    # Iterate through each data column
-    for i, col in enumerate(data_cols):
-        # Create a DataFrame for the current data column and "dorso-ventral" column
-        data = sheet_df [[col, subgroups_name]]
-        
-        # Create a violin plot for the current data column
-        sns.violinplot(x=subgroups_name, y=col, data=data, ax=ax, position=i+offset)
-        
-        # Update the offset for the next plot
-        offset += 0.2  # Adjust the value as needed
-        
-        # Append the data to the list
-        violin_plot_data.append(data)
-
-    # Set the x-axis label
-    ax.set_xlabel(subgroups_name)
-    ax.set_ylabel('Synaptic count (%)')
-
-    # Set the title
-    ax.set_title("Violin Plots for Each Column")
-
-
-    ##Statistics. Pair-wise comparison between subgroups in each cell type
-    # !!! So far meant for just 2 subgroups only
-
-    data_cols = sheet_df .columns[:-1]
-
-    # Create an empty list to store p-values
-    p_values_list = []
-
-    # Iterate through each data column
-    for col in data_cols:
-        # Get unique dorso-ventral categories
-        categories = sheet_df [subgroups_name].unique()
-        
-        # Initialize a list to store p-values for the current data column
-        p_values_col = []
-        
-        # If only one category exists, append None to p_values_col and continue
-        if len(categories) == 1:
-            p_values_col.append(None)
-            p_values_list.append(p_values_col)
-            continue
-        
-        # Generate combinations of categories for pairwise comparison
-        category_combinations = combinations(categories, 2)
-        
-        # Iterate through category combinations
-        for cat1, cat2 in category_combinations:
-            group1 = sheet_df [sheet_df [subgroups_name] == cat1][col]
-            group2 = sheet_df [sheet_df [subgroups_name] == cat2][col]
-            
-            # Perform the Shapiro-Wilk test for normality
-            _, p_value1 = stats.shapiro(group1)
-            _, p_value2 = stats.shapiro(group2)
-            
-            # Decide whether to use parametric or non-parametric test based on normality
-            if p_value1 > 0.05 and p_value2 > 0.05:
-                t_statistic, p_value = stats.ttest_ind(group1, group2)
-                print(f'{col} is normally distributed')
-            else:
-                _, p_value = stats.mannwhitneyu(group1, group2)
-            
-            p_values_col.append(p_value)
-        
-        p_values_list = p_values_list + p_values_col
-
-    # Convert the p-values list to a DataFrame
-    p_values_df = pd.DataFrame()
-    p_values_df['Neuron'] = data_cols.tolist()
-    p_values_df['p_value'] = p_values_list
-
-    # Display the p-values DataFrame
-    print(f'Significant difference between {subgroups_name}')
-    print(p_values_df[p_values_df["p_value"]<0.05])
-
-    if save_figures:
-        figure_title = f'\Testing_violin_plots{_sheet}.pdf'
-        fig.savefig(fig_save_path+figure_title)
 
 ################################################## Plotting clusters ######################################
 

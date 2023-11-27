@@ -22,11 +22,9 @@ import matplotlib.gridspec as gridspec
 from matplotlib.backends.backend_pdf import PdfPages
 from openpyxl import load_workbook
 import os
-from caveclient import CAVEclient
-client = CAVEclient('flywire_fafb_production')
 
 #Importing custom functions from helper file
-from helper import replace_outliers_with_nan, calculate_correlation_and_p_values, cosine_similarity_and_clustering
+from helper_nature import replace_outliers_with_nan, calculate_correlation_and_p_values, cosine_similarity_and_clustering
 
 #%% 
 ############################################# GENERAL SETTINGS: PLOTS #########################################
