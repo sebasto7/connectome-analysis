@@ -320,6 +320,7 @@ def calculate_neuron_weights(pre_post_counts, post_inputs, up_to_date_pre_ids, m
 def match_all_pre_to_single_post(up_to_date_post_ids, up_to_date_pre_ids, neuropile_mesh):
     
     from fafbseg import flywire
+    print('Matching all pre to single post')
     
     # Fetch the neuron's inputs
     post_inputs = flywire.synapses.fetch_synapses(
@@ -348,25 +349,42 @@ def match_all_pre_to_single_post(up_to_date_post_ids, up_to_date_pre_ids, neurop
 
 
 
-def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_update_df, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area):
+def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_update_df, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area,single_column_diameter):
     """
     Calculates the TOTAL spatial span of all presynaptic neurons in the list that together contact the same postsynaptic neuron,
     for a list of postsynaptic neurons
     """
+   
     
     import pandas as pd
     import numpy as np
-    from scipy.spatial import ConvexHull
+    from scipy.spatial import ConvexHull, distance
     from scipy import stats
+    print('Calculating spatial span')
     
+    #For all presynaptic neurons that togeter contact same postsynaptic neuron:
     pre_post_volumes = []
     pre_post_areas = []
+    pre_post_diameters = []
     pre_count = []
     pre_xzy_ls = []
     post_xzy_ls = []
     pre_center_ls = []
     num_pre_sites = []
     hull_ls = []
+    
+    #For individual presynaptic neurons:
+    individual_pre_xzy_ls = []
+    individual_post_xzy_ls = []
+    individual_pre_center_ls = []
+    individual_num_pre_sites = []
+    individual_pre_post_volumes = []
+    individual_pre_post_areas = []
+    individual_pre_post_diameters = []
+    individual_hull_ls = []
+    individual_pre_count = []
+    individual_curr_post = []
+    
 
     for i in range(0, len(up_to_date_post_ids)):
         curr_post = up_to_date_post_ids[i]
@@ -387,10 +405,13 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
 
         post_xyz *= [4, 4, 40]  # For plotting it using navis (correcting for data resolution)
         post_xzy_ls.append(post_xyz)
+        
 
         # Getting presynaptic cells coordinates based on postsynaptic location
         curr_post_inputs = post_inputs[post_inputs['post_pt_root_id'] == curr_post].copy()
 
+        
+        ## For all presynaptic neurons that togeter contact same postsynaptic neuron:
         # Getting presynaptic cells coordinates based on postsynaptic location
         curr_pre_ls = pre_post_counts[pre_post_counts['post_pt_root_id'] == curr_post]['pre_pt_root_id'].tolist()
         curr_pre_inputs = pre_inputs[pre_inputs['post_pt_root_id'].isin(curr_pre_ls)].copy()
@@ -403,6 +424,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
             pre_center_ls.append(None)
             num_pre_sites.append(None)
             hull_ls.append(None)
+            pre_post_diameters.append(None)
         else:
             pre_count.append(len(curr_pre_ls))
 
@@ -422,6 +444,20 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
             hull = ConvexHull(pre_xyz)
             volume = hull.volume
             pre_post_volumes.append(volume)
+            
+            # Calculate largest diameter
+            largest_diameter = 0
+            for simplex in hull.simplices:
+                for i in range(len(simplex)):
+                    for j in range(i+1, len(simplex)):
+                        # Calculate distance between two points
+                        d = distance.euclidean(pre_xyz[simplex[i]], pre_xyz[simplex[j]])
+                        if d > largest_diameter:
+                            largest_diameter = d
+
+            # Convert largest diameter to micrometers
+            largest_diameter_um = largest_diameter / 10**6
+            pre_post_diameters.append(largest_diameter_um)
 
             # Calculate volume/area based on projections using PCA on presynaptic partner coordinates
             # PCA to get an approximate area of the volume
@@ -449,12 +485,97 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
             area = hull.volume  # Area is calculated as volume in 2D
             area_um2 = area / 10**6
             pre_post_areas.append(area_um2)
+            
+            
+        ## For individual presynaptic neurons:
+        # Getting presynaptic cells coordinates based on postsynaptic location
+        curr_pre_ls = pre_post_counts[pre_post_counts['post_pt_root_id'] == curr_post]['pre_pt_root_id'].tolist()
+        for curr_pre in curr_pre_ls:
+            individual_post_xzy_ls.append(post_xyz)
+            individual_curr_post.append(curr_post)
+            curr_pre_inputs = pre_inputs[pre_inputs['post_pt_root_id'].isin([curr_pre])].copy()
+            if len(curr_pre_inputs) < 5:
+                individual_pre_post_volumes.append(None)
+                individual_pre_post_areas.append(None)
+                individual_pre_count.append(None)
+                individual_pre_xzy_ls.append(None)
+                individual_pre_center_ls.append(None)
+                individual_num_pre_sites.append(None)
+                individual_hull_ls.append(None)
+                individual_pre_post_diameters.append(None)
+            else:
+                individual_pre_count.append(len([curr_pre]))
 
-    # Summary data frame
+                # Getting presynaptic cells coordinates
+                temp_pre_coords = curr_pre_inputs['pre_pt_position'].tolist()
+
+                # Correcting xyz positions for mesh plotting
+                pre_xyz = np.array([list(np.array(l) * [4, 4, 40]) for l in temp_pre_coords])
+                individual_pre_xzy_ls.append(pre_xyz)
+                individual_num_pre_sites.append(len(pre_xyz))  # Total number of points in the presynaptic partner(s)
+
+                # Calculate the center of the cloud of points
+                pre_center = np.mean(pre_xyz, axis=0)
+                individual_pre_center_ls.append(pre_center)
+
+                # Calculate the volume of the cloud using the convex hull method
+                hull = ConvexHull(pre_xyz)
+                volume = hull.volume
+                individual_pre_post_volumes.append(volume)
+                
+                # Calculate largest diameter
+                largest_diameter = 0
+                for simplex in hull.simplices:
+                    for i in range(len(simplex)):
+                        for j in range(i+1, len(simplex)):
+                            # Calculate distance between two points
+                            d = distance.euclidean(pre_xyz[simplex[i]], pre_xyz[simplex[j]])
+                            if d > largest_diameter:
+                                largest_diameter = d
+
+                # Convert largest diameter to micrometers
+                largest_diameter_um = largest_diameter / 10**3
+                individual_pre_post_diameters.append(largest_diameter_um)
+                
+
+                # Calculate volume/area based on projections using PCA on presynaptic partner coordinates
+                # PCA to get an approximate area of the volume
+                pre_mean = np.mean(pre_xyz, axis=0)
+                pre_centered_points = pre_xyz - pre_mean
+                pre_cov_matrix = np.cov(pre_centered_points, rowvar=False)
+                pre_eigenvalues, pre_eigenvectors = np.linalg.eigh(pre_cov_matrix)
+                pre_normal_vector = pre_eigenvectors[:, [1, 2]]  # PC2 and PC3
+
+                # Calculate volume/area based on projections using PCA on postsynaptic partner coordinates
+                temp_post_coords = curr_post_inputs['pre_pt_position'].tolist()
+                post_xyz = np.array([list(np.array(l) * [4, 4, 40]) for l in temp_post_coords])
+                post_mean = np.mean(post_xyz, axis=0)
+                post_centered_points = post_xyz - post_mean
+                post_cov_matrix = np.cov(post_centered_points, rowvar=False)
+                post_eigenvalues, post_eigenvectors = np.linalg.eigh(post_cov_matrix)
+                post_normal_vector = post_eigenvectors[:, [0, 1]]  # PC1 and PC2
+
+                # Project the points
+                projected_points = pre_centered_points.dot(post_normal_vector)
+
+                # Calculate area
+                hull = ConvexHull(projected_points)
+                individual_hull_ls.append(hull)
+                area = hull.volume  # Area is calculated as volume in 2D
+                area_um2 = area / 10**6
+                individual_pre_post_areas.append(area_um2)
+                
+                
+
+            
+            
+
+    # Summary data frames
     spatial_span_df = pd.DataFrame()
     spatial_span_df['bodyId_post'] = up_to_date_post_ids
     spatial_span_df['Volume'] = pre_post_volumes
     spatial_span_df['Area'] = pre_post_areas
+    spatial_span_df['Diameter'] = pre_post_diameters
     spatial_span_df['Hull'] = hull_ls
     spatial_span_df['Pre_count'] = pre_count
     spatial_span_df['Pre_xyz'] = pre_xzy_ls
@@ -464,5 +585,22 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     spatial_span_df['Area_zscore'] = (spatial_span_df['Area'] - spatial_span_df['Area'].mean()) / spatial_span_df['Area'].std()
     spatial_span_df['Num_pre_sites'] = num_pre_sites
     spatial_span_df['Num_columns'] = [round(area / single_column_area) if area is not None else None for area in pre_post_areas]
+    spatial_span_df['Column_span'] = [round(diameter / single_column_diameter) if diameter is not None else None for diameter in pre_post_diameters]
+    
+    individual_spatial_span_df = pd.DataFrame()
+    individual_spatial_span_df['bodyId_post'] = individual_curr_post
+    individual_spatial_span_df['Volume'] = individual_pre_post_volumes
+    individual_spatial_span_df['Area'] = individual_pre_post_areas
+    individual_spatial_span_df['Diameter'] = individual_pre_post_diameters
+    individual_spatial_span_df['Hull'] = individual_hull_ls
+    individual_spatial_span_df['Pre_count'] = individual_pre_count
+    individual_spatial_span_df['Pre_xyz'] = individual_pre_xzy_ls
+    individual_spatial_span_df['Pre_center'] = individual_pre_center_ls
+    individual_spatial_span_df['Post_xyz'] = individual_post_xzy_ls
+    individual_spatial_span_df.set_index('bodyId_post', inplace=True)
+    individual_spatial_span_df['Area_zscore'] = (individual_spatial_span_df['Area'] - individual_spatial_span_df['Area'].mean()) / individual_spatial_span_df['Area'].std()
+    individual_spatial_span_df['Num_pre_sites'] = individual_num_pre_sites
+    individual_spatial_span_df['Num_columns'] = [round(area / single_column_area) if area is not None else None for area in individual_pre_post_areas]
+    individual_spatial_span_df['Column_span'] = [round(diameter / single_column_diameter) if diameter is not None else None for diameter in individual_pre_post_diameters]
 
-    return spatial_span_df
+    return spatial_span_df, individual_spatial_span_df
