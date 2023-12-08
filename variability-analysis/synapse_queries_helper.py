@@ -372,6 +372,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     pre_center_ls = []
     num_pre_sites = []
     hull_ls = []
+    pre_projected_points_ls = []
     
     #For individual presynaptic neurons:
     individual_pre_xzy_ls = []
@@ -384,6 +385,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     individual_hull_ls = []
     individual_pre_count = []
     individual_curr_post = []
+    individual_pre_projected_points_ls = []
     
 
     for i in range(0, len(up_to_date_post_ids)):
@@ -425,6 +427,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
             num_pre_sites.append(None)
             hull_ls.append(None)
             pre_post_diameters.append(None)
+            pre_projected_points_ls.append(None)
         else:
             pre_count.append(len(curr_pre_ls))
 
@@ -478,6 +481,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
 
             # Project the points
             projected_points = pre_centered_points.dot(post_normal_vector)
+            pre_projected_points_ls.append(projected_points)
 
             # Calculate area
             hull = ConvexHull(projected_points)
@@ -503,6 +507,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
                 individual_num_pre_sites.append(None)
                 individual_hull_ls.append(None)
                 individual_pre_post_diameters.append(None)
+                individual_pre_projected_points_ls.append(None)
             else:
                 individual_pre_count.append(len([curr_pre]))
 
@@ -557,6 +562,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
 
                 # Project the points
                 projected_points = pre_centered_points.dot(post_normal_vector)
+                individual_pre_projected_points_ls.append(projected_points)
 
                 # Calculate area
                 hull = ConvexHull(projected_points)
@@ -581,6 +587,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     spatial_span_df['Pre_xyz'] = pre_xzy_ls
     spatial_span_df['Pre_center'] = pre_center_ls
     spatial_span_df['Post_xyz'] = post_xzy_ls
+    spatial_span_df['pre_projected_points'] = pre_projected_points_ls
     spatial_span_df.set_index('bodyId_post', inplace=True)
     spatial_span_df['Area_zscore'] = (spatial_span_df['Area'] - spatial_span_df['Area'].mean()) / spatial_span_df['Area'].std()
     spatial_span_df['Num_pre_sites'] = num_pre_sites
@@ -597,6 +604,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     individual_spatial_span_df['Pre_xyz'] = individual_pre_xzy_ls
     individual_spatial_span_df['Pre_center'] = individual_pre_center_ls
     individual_spatial_span_df['Post_xyz'] = individual_post_xzy_ls
+    individual_spatial_span_df['pre_projected_points'] = individual_pre_projected_points_ls
     individual_spatial_span_df.set_index('bodyId_post', inplace=True)
     individual_spatial_span_df['Area_zscore'] = (individual_spatial_span_df['Area'] - individual_spatial_span_df['Area'].mean()) / individual_spatial_span_df['Area'].std()
     individual_spatial_span_df['Num_pre_sites'] = individual_num_pre_sites
