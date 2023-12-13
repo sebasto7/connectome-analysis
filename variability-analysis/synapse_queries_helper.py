@@ -366,6 +366,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     pre_post_volumes = []
     pre_post_areas = []
     pre_post_diameters = []
+    pre_post_diameters_projected = []
     pre_count = []
     pre_xzy_ls = []
     post_xzy_ls = []
@@ -382,6 +383,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     individual_pre_post_volumes = []
     individual_pre_post_areas = []
     individual_pre_post_diameters = []
+    individual_pre_post_diameters_projected = []
     individual_hull_ls = []
     individual_pre_count = []
     individual_curr_post = []
@@ -427,6 +429,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
             num_pre_sites.append(None)
             hull_ls.append(None)
             pre_post_diameters.append(None)
+            pre_post_diameters_projected.append(None)
             pre_projected_points_ls.append(None)
         else:
             pre_count.append(len(curr_pre_ls))
@@ -459,7 +462,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
                             largest_diameter = d
 
             # Convert largest diameter to micrometers
-            largest_diameter_um = largest_diameter / 10**6
+            largest_diameter_um = largest_diameter / 10**3
             pre_post_diameters.append(largest_diameter_um)
 
             # Calculate volume/area based on projections using PCA on presynaptic partner coordinates
@@ -490,6 +493,20 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
             area_um2 = area / 10**6
             pre_post_areas.append(area_um2)
             
+            # Calculate largest diameter
+            largest_diameter = 0
+            for simplex in hull.simplices:
+                for i in range(len(simplex)):
+                    for j in range(i+1, len(simplex)):
+                        # Calculate distance between two points
+                        d = distance.euclidean(projected_points[simplex[i]], projected_points[simplex[j]])
+                        if d > largest_diameter:
+                            largest_diameter = d
+
+            # Convert largest diameter to micrometers
+            largest_diameter_um = largest_diameter / 10**3
+            pre_post_diameters_projected.append(largest_diameter_um)
+            
             
         ## For individual presynaptic neurons:
         # Getting presynaptic cells coordinates based on postsynaptic location
@@ -507,6 +524,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
                 individual_num_pre_sites.append(None)
                 individual_hull_ls.append(None)
                 individual_pre_post_diameters.append(None)
+                individual_pre_post_diameters_projected.append(None)
                 individual_pre_projected_points_ls.append(None)
             else:
                 individual_pre_count.append(len([curr_pre]))
@@ -571,6 +589,20 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
                 area_um2 = area / 10**6
                 individual_pre_post_areas.append(area_um2)
                 
+                # Calculate largest diameter
+                largest_diameter = 0
+                for simplex in hull.simplices:
+                    for i in range(len(simplex)):
+                        for j in range(i+1, len(simplex)):
+                            # Calculate distance between two points
+                            d = distance.euclidean(projected_points[simplex[i]], projected_points[simplex[j]])
+                            if d > largest_diameter:
+                                largest_diameter = d
+
+                # Convert largest diameter to micrometers
+                largest_diameter_um = largest_diameter / 10**3
+                individual_pre_post_diameters_projected.append(largest_diameter_um)
+                
                 
 
             
@@ -582,6 +614,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     spatial_span_df['Volume'] = pre_post_volumes
     spatial_span_df['Area'] = pre_post_areas
     spatial_span_df['Diameter'] = pre_post_diameters
+    spatial_span_df['Diameter_projected'] = pre_post_diameters_projected
     spatial_span_df['Hull'] = hull_ls
     spatial_span_df['Pre_count'] = pre_count
     spatial_span_df['Pre_xyz'] = pre_xzy_ls
@@ -593,12 +626,14 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     spatial_span_df['Num_pre_sites'] = num_pre_sites
     spatial_span_df['Num_columns'] = [round(area / single_column_area) if area is not None else None for area in pre_post_areas]
     spatial_span_df['Column_span'] = [round(diameter / single_column_diameter) if diameter is not None else None for diameter in pre_post_diameters]
+    spatial_span_df['Column_span_projected'] = [round(diameter / single_column_diameter) if diameter is not None else None for diameter in pre_post_diameters_projected]
     
     individual_spatial_span_df = pd.DataFrame()
     individual_spatial_span_df['bodyId_post'] = individual_curr_post
     individual_spatial_span_df['Volume'] = individual_pre_post_volumes
     individual_spatial_span_df['Area'] = individual_pre_post_areas
     individual_spatial_span_df['Diameter'] = individual_pre_post_diameters
+    individual_spatial_span_df['Diameter_projected'] = individual_pre_post_diameters_projected
     individual_spatial_span_df['Hull'] = individual_hull_ls
     individual_spatial_span_df['Pre_count'] = individual_pre_count
     individual_spatial_span_df['Pre_xyz'] = individual_pre_xzy_ls
@@ -610,5 +645,6 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
     individual_spatial_span_df['Num_pre_sites'] = individual_num_pre_sites
     individual_spatial_span_df['Num_columns'] = [round(area / single_column_area) if area is not None else None for area in individual_pre_post_areas]
     individual_spatial_span_df['Column_span'] = [round(diameter / single_column_diameter) if diameter is not None else None for diameter in individual_pre_post_diameters]
+    individual_spatial_span_df['Column_span_projected'] = [round(diameter / single_column_diameter) if diameter is not None else None for diameter in individual_pre_post_diameters_projected]
 
     return spatial_span_df, individual_spatial_span_df
