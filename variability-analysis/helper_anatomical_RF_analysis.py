@@ -1,22 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Anatomical receptive field (RF) analysis, including area and column span.
+Helper for anatomical receptive field (RF) analysis.
+Iincludes custom-written fiunctions for analysis and plot.
 Clean code for publication
 
 @author: Sebastian Molina-Obando
 """
 
-#%% Importing packages
-import seaborn as sns
-import matplotlib.pyplot as plt
-import os
-import pandas as pd
-import numpy as np
-from scipy.spatial import ConvexHull, distance
-from fafbseg import flywire
-import navis
-
-#%%Custom-written functions
+#%%Analysis functions
 
 def combine_xyz(df):
     """
@@ -98,7 +89,7 @@ def match_all_pre_to_single_post(up_to_date_post_ids, up_to_date_pre_ids, neurop
 
     return pre_post_counts, post_inputs
 
-def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_update_df, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area,single_column_diameter):
+def calculate_spatial_span(up_to_date_post_ids, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area,single_column_diameter):
     """
     Calculate the total and individual spatial span of presynaptic neurons contacting the same postsynaptic neuron.
 
@@ -156,12 +147,8 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
         curr_post = up_to_date_post_ids[i]
 
         # Getting single postynaptic cell's coordinates
-        try:
-            old_curr_post = update_df[update_df['new_id'] == curr_post]['old_id'].tolist()[0]
-        except:
-            old_curr_post = str(curr_post)
-
-        single_post_coords = R_post_df[R_post_df['Updated_seg_id'] == old_curr_post]['XYZ-ME'].to_numpy(dtype=str, copy=True)
+        curr_post = str(curr_post)
+        single_post_coords = R_post_df[R_post_df['Updated_seg_id'] == curr_post]['XYZ-ME'].to_numpy(dtype=str, copy=True)
         post_xyz = np.zeros([np.shape(single_post_coords)[0], 3])
         new_post_coords = np.zeros([np.shape(single_post_coords)[0], 3])
 
@@ -365,11 +352,7 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
                 largest_diameter_um = largest_diameter / 10**3
                 individual_pre_post_diameters_projected.append(largest_diameter_um)
                 
-                
-
             
-            
-
     # Summary data frames
     spatial_span_df = pd.DataFrame()
     spatial_span_df['bodyId_post'] = up_to_date_post_ids
@@ -411,167 +394,31 @@ def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_upd
 
     return spatial_span_df, individual_spatial_span_df
 
-
-#%% General plotting settings
-PC_disc = 'D'
-dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'
-fig_save_path = os.path.join(dataPath,"Figures")
-save_figures = True
-
-#General style
-font = {'family' : 'arial',
-        'weight' : 'normal',
-        'size'   : 8}
-axes = {'labelsize': 12, 'titlesize': 12}
-ticks = {'labelsize': 10}
-legend = {'fontsize': 8}
-plt.rc('font', **font)
-plt.rc('axes', **axes)
-plt.rc('xtick', **ticks)
-plt.rc('ytick', **ticks)
-
-#Saving text for pdfs in a proper way
-matplotlib.rcParams['pdf.fonttype'] = 42
-matplotlib.rcParams['ps.fonttype'] = 42
-
-# For plotting purposes
-
-hemisphere = 'R' 
-neuropile_mesh = 'ME_L' # for fafbseq version before versino 2.0.0 (if later used, this should read: 'ME_R')
-mesh_azim = 16
-mesh_elev = -50 
-
-
-
-#%% Data analysis 
-##################################################### Presynaptic partner analysis ########################################################
-# Loading data
-PC_disc = 'D'
-dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'
-fig_save_path = os.path.join(dataPath,"Figures")
-save_figures = True
-
-current_data = 'Tm9_700_R_20231113.xlsx'
-
-filePath =  os.path.join(dataPath,current_data)
-_sheet_name = 'Relative_counts'
-
-data_df = pd.read_excel(filePath, sheet_name=_sheet_name,index_col = 0)
-display(data_df.head())
-number_of_columns = len(data_df)
-pre_partners_ls = data_df.columns.tolist()
-print(f'Total number of columns: {number_of_columns}')
-print(f'All presynatic partners: \n {pre_partners_ls}')
-
-# Applying a presence threshold based on NaN values
-percetatge_prescence = 0.05
-threshold = percetatge_prescence * len(data_df)
-
-# Filter columns based on the threshold
-filtered_data_df = data_df.dropna(thresh=threshold, axis=1)
-filtered_pre_partners_ls = filtered_data_df.columns.tolist()
-print(f'All presynatic partners after threshold: \n {filtered_pre_partners_ls}')
-
-# Visualization of sorted inputs from hight to low
-_data = filtered_data_df
-fig, axs = plt.subplots(1, 1, figsize=(10, 10))
-fig.subplots_adjust(hspace=0.5)
-fig.suptitle(f'Wide field input partners (n = {number_of_columns}). \n {_sheet_name}')
-sns.boxplot(data=_data[_data.mean().sort_values(ascending = False).index], ax=axs)
-axs.set_ylabel('Relative Counts')
-axs.set_xticklabels(axs.get_xticklabels(), rotation=90) 
-plt.show()
-
-
-
-#%% Anatomical RF analysis (area and column span)
-
-#Defined variables for analysis purposes
-min_desired_count = 3 # minimun desired number of contacts between pre and post neurons to be considered
-single_column_diameter = 11.2 # in um (measured in FlyWire)
-single_column_area = 100 # in um^2 (Assumed column as circle)
-hemisphere = 'R'
-
-
-########################################### Analysis for single presynaptic neuron of interest ########################################### 
-
-## Loading information  from excel files
-PC_disc = 'D'
-dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\drive-data-sets\database'
-date = '20230912'
-pre_neuron_type = 'Dm12'
-post_neuron_type = 'Tm9'
-fileName_post = f'{post_neuron_type} proofreadings.xlsx'
-filePath_post = os.path.join(dataPath,fileName_post)
-fileName_pre = f'{pre_neuron_type} proofreadings.xlsx'
-filePath_pre = os.path.join(dataPath,fileName_pre)
-
-#Loading file as DataFrame
-post_df = pd.read_excel(filePath_post)
-pre_df = pd.read_excel(filePath_pre)
-
-## Filtering data
-# Selecting the R optic lobe IDs
-R_pre_df = pre_df[pre_df['hemisphere'] == hemisphere].copy()
-R_post_df = post_df[post_df['hemisphere'] == hemisphere].copy()
-# Selecting the backbone proofread IDs
-R_post_df = R_post_df[R_post_df['backbone proofread (Y/N)'] == 'Y'].copy()
-# Selecting presynaptic cells ids
-pre_ids = R_pre_df['Updated_seg_id'].tolist()
-
-## Quick ID updates
-# Updating presynaptic neurons if they are not up-to-date
-if not np.unique(flywire.is_latest_root(pre_ids))[0]: #if not up-to-date
-    print('Consider updating your ids in the original pre-neuron data set:')
-    pre_ids_update_df = flywire.update_ids(pre_ids, stop_layer=2, supervoxels=None, timestamp=None, dataset='production', progress=True)
-    up_to_date_pre_ids = pre_ids_update_df['new_id'].tolist()
-    display(pre_ids_update_df[pre_ids_update_df['changed'] == True])
-else:
-    up_to_date_pre_ids = [int(x) for x in pre_ids]
-    print('All pre ids were up to date')
+#%% Plotting functions
+def add_mean_median_lines(data, ax, color_mean, color_median, vertical=True):
+    #mean_value = np.nanmean(data)
+    median_value = np.nanmedian(data)
     
+    if vertical:
+        #ax.axvline(mean_value, color=color_mean, linestyle='dashed', linewidth=2, label=f'Mean: {mean_value:.2f}')
+        ax.axvline(median_value, color=color_median, linestyle='dashed', linewidth=2, label=f'Median: {median_value:.2f}')
+    else:
+        #ax.axhline(mean_value, color=color_mean, linestyle='dashed', linewidth=2, label=f'Mean: {mean_value:.2f}')
+        ax.axhline(median_value, color=color_median, linestyle='dashed', linewidth=2, label=f'Median: {median_value:.2f}')
 
-#Getting postsynaptic side ID
-post_ids = R_post_df['Updated_seg_id'].tolist()
+def replace_outliers_with_nan(df, multiplier=1.5):
+    # Calculate the first quartile (Q1) and third quartile (Q3) for each column
+    q1 = df.quantile(0.25)
+    q3 = df.quantile(0.75)
 
-## Updating postsynaptic neurons if they are not up-to-date
-if not np.unique(flywire.is_latest_root(post_ids))[0]: # if not up-to-date
-    print('Consider updating your ids in the original post neuron data set:')
-    #Updating the IDs via Fafbseg
-    post_ids_update_df = flywire.update_ids(post_ids, stop_layer=2, supervoxels=None, timestamp=None, dataset='production', progress=True)
-    up_to_date_post_ids = post_ids_update_df['new_id']
-    display(post_ids_update_df[post_ids_update_df['confidence'] < 1])
-else:
-    up_to_date_post_ids = [int(x) for x in post_ids]
-    print('All post ids were up to date')
-    
+    # Calculate the IQR for each column
+    iqr = q3 - q1
 
-## Doing the pre to post match
-pre_post_counts, post_inputs = match_all_pre_to_single_post(up_to_date_post_ids, up_to_date_pre_ids, neuropile_mesh) 
+    # Determine the lower and upper bounds for outlier detection
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
 
+    # Replace outlier values with NaN
+    df_filtered = df.mask((df < lower_bound) | (df > upper_bound))
 
-## Analysis of spatial span of preynaptic inputs to single, unicolumnar, postsynaptic cells 
-
-# Synaptic counts filter
-pre_post_counts = pre_post_counts[pre_post_counts['pre_syn_count']>=min_desired_count].copy()
-print('Pre-post match example after min syn fiter:')
-
-## Geeting information for all pre cells 
-pre_ls = pre_post_counts['pre_pt_root_id'].tolist() # all postsynaptic neurons
-
-# Fetch the inputs from presynaptic cells
-
-pre_inputs = flywire.synapses.fetch_synapses(pre_ls, pre=True, post=True, attach=True, 
-                                             min_score=50, clean=True, transmitters=False, 
-                                             neuropils=True, batch_size=30, 
-                                             dataset='production', progress=True,mat= "live")
-
-# Filtering: keeping only synapses in the medulla
-pre_inputs = pre_inputs[pre_inputs['neuropil'] == neuropile_mesh].copy()
-len(pre_inputs)
-
-#Combining pre- and postsynpases XYZ values in single columns
-combine_xyz(pre_inputs) # Function that does the operation
-
-## Quantificatino of the spatial span
-spatial_span_df, individual_spatial_span_df = calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_update_df, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area, single_column_diameter)
+    return df_filtered
