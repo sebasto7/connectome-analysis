@@ -89,7 +89,7 @@ def match_all_pre_to_single_post(up_to_date_post_ids, up_to_date_pre_ids, neurop
 
     return pre_post_counts, post_inputs
 
-def calculate_spatial_span(up_to_date_post_ids, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area,single_column_diameter):
+def calculate_spatial_span(up_to_date_post_ids, up_to_date_pre_ids, post_ids_update_df, R_post_df, post_inputs, pre_post_counts, pre_inputs, single_column_area,single_column_diameter):
     """
     Calculate the total and individual spatial span of presynaptic neurons contacting the same postsynaptic neuron.
 
@@ -113,6 +113,7 @@ def calculate_spatial_span(up_to_date_post_ids, R_post_df, post_inputs, pre_post
     import pandas as pd
     import numpy as np
     from scipy.spatial import ConvexHull, distance
+    from scipy import stats
     print('Calculating spatial span')
     
     #For all presynaptic neurons that togeter contact same postsynaptic neuron:
@@ -147,8 +148,12 @@ def calculate_spatial_span(up_to_date_post_ids, R_post_df, post_inputs, pre_post
         curr_post = up_to_date_post_ids[i]
 
         # Getting single postynaptic cell's coordinates
-        curr_post = str(curr_post)
-        single_post_coords = R_post_df[R_post_df['Updated_seg_id'] == curr_post]['XYZ-ME'].to_numpy(dtype=str, copy=True)
+        try:
+            old_curr_post = update_df[update_df['new_id'] == curr_post]['old_id'].tolist()[0]
+        except:
+            old_curr_post = str(curr_post)
+
+        single_post_coords = R_post_df[R_post_df['Updated_seg_id'] == old_curr_post]['XYZ-ME'].to_numpy(dtype=str, copy=True)
         post_xyz = np.zeros([np.shape(single_post_coords)[0], 3])
         new_post_coords = np.zeros([np.shape(single_post_coords)[0], 3])
 
@@ -352,7 +357,11 @@ def calculate_spatial_span(up_to_date_post_ids, R_post_df, post_inputs, pre_post
                 largest_diameter_um = largest_diameter / 10**3
                 individual_pre_post_diameters_projected.append(largest_diameter_um)
                 
+                
+
             
+            
+
     # Summary data frames
     spatial_span_df = pd.DataFrame()
     spatial_span_df['bodyId_post'] = up_to_date_post_ids
@@ -396,6 +405,8 @@ def calculate_spatial_span(up_to_date_post_ids, R_post_df, post_inputs, pre_post
 
 #%% Plotting functions
 def add_mean_median_lines(data, ax, color_mean, color_median, vertical=True):
+    import numpy as np
+    
     #mean_value = np.nanmean(data)
     median_value = np.nanmedian(data)
     
