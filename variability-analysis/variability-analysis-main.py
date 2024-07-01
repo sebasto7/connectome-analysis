@@ -64,7 +64,7 @@ cm = 1/2.54  # centimeters in inches
 #Sorting options for plots
 sort_by = 'mean_abs_count' # 'median_rank', 'median_abs_count', 'median_rel_count', 'column_%', 'mean_abs_count' (used in the Nature submission)
 #Choosing type of data for cosine similarity and cluster analysis
-relative_or_absolute = 'relative-counts' # 'absolute-counts', 'relative-counts' 
+relative_or_absolute = 'absolute-counts' # 'absolute-counts', 'relative-counts' 
 
 #Plots by category (e.g. dorsal (D) vs ventral (V) or rigth (R) vs left (L))
 category_column = 'dorso-ventral'# 'dorso-ventral', 'hemisphere'
@@ -76,7 +76,7 @@ hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3', Tm2: '
 neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3', Tm2: '#a6761d'
 #YES-NO options
 plot_data = True
-save_figures = True
+save_figures = False
 exclude_outliers = True # Plot variability without outliers
 stacked_plots = False 
 
@@ -157,7 +157,7 @@ subselection_id_columns = [] # list of optic_lobe_ids
 #Loading file for subselection
 subselection_file = True
 txtPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'#r'C:\Connectomics-Data\FlyWire\Txts\optic_lobes_ids'
-fileName_txt = f'Tm9_700_healthy_L3_over_30_{optic_lobe}.txt' # Tm9_300_healthy_L3_{optic_lobe}.txt, Tm9_490_healthy_L3_over_10_{optic_lobe}.txt, 'Tm9_490_{optic_lobe}.txt', 'Tm9_700_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
+fileName_txt = f'Tm9_700_{optic_lobe}.txt' # 'Tm9_700_healthy_L3_over_30_{optic_lobe}.txt',  Tm9_300_healthy_L3_{optic_lobe}.txt, Tm9_490_healthy_L3_over_10_{optic_lobe}.txt, 'Tm9_490_{optic_lobe}.txt', 'Tm9_700_{optic_lobe}.txt',  'Tm2_healthy_L3_{optic_lobe}.txt', 'Tm9_healthy_L3_{optic_lobe}.txt', 'Tm9_D_patch_L.txt' 'Tm9_cosine_similarity_C2_{optic_lobe}.txt', 'Tm9_sparse_healthy_R.txt', 'Tm9_sparse_L.txt' , 'Tm9_dark_L3_R.txt', 'Tm9_sparse_healthy_L3_L_R.txt', 'Tm9_consine_similarity_cluster_1_2_R.txt'
 
 
 # Healthy columns based on lamina detachement and damage L3s
@@ -169,7 +169,7 @@ ExM_dataPath =  f'{PC_disc}:\Connectomics-Data\FlyWire\Excels\expansion-microsco
 
 
 #Processed data saving path
-saving_processed_data = True
+saving_processed_data = False
 output_dataPath = f'{PC_disc}:\Connectomics-Data\FlyWire\Processed-data'#r'C:\Connectomics-Data\FlyWire\Processed-data'
 
 
@@ -3904,17 +3904,24 @@ if plot_data:
         # Generate the plot for the current object
         dot_sizes = _data[pre_partner].fillna(0).tolist()
         dot_sizes_ME = [size * 10 for size in dot_sizes]  # Increase size by a factor of X
+        dot_sizes_present = [size * 2 for size in dot_sizes]  # Increase size by a factor of X
+        dot_sizes_not_present = [0 if value != 0 else 2 for value in dot_sizes] # Get the "anti-list"
+
+        # Plotting all dots in magenta. Locations where the partner is present will have dot_size = 0
+        ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=dot_sizes_not_present,c='m',alpha=1) 
 
         # Plot the object
+        # Now plotting all dots in green. Before: c=neuron_color, s=dot_sizes_ME, alpha=0.9
+        # Locations where the partner is NOT present will have dot_size = 0
         ax.scatter(
             xyz_pre_arr_new[:, 0],
             xyz_pre_arr_new[:, 1],
             xyz_pre_arr_new[:, 2],
-            s=dot_sizes_ME,
-            c=neuron_color,
-            alpha=0.9
+            s=dot_sizes_present,
+            c='g',
+            alpha=1
         )
-        ax.scatter(xyz_pre_arr_new[:, 0], xyz_pre_arr_new[:, 1], xyz_pre_arr_new[:, 2], s=2,c='k',alpha=1) # All dots
+        
         navis.plot2d([OL_R], method='3d_complex', ax=ax,view=(172, 51),scalebar = '20 um') #
 
         # Rotating the view
