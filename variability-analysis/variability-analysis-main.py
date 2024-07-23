@@ -76,7 +76,7 @@ hex_color = 'light:#458A7C' # Tm9: 'light:#458A7C', Tm1: 'light:#D57DA3', Tm2: '
 neuron_color = '#458A7C' # Tm9: '#458A7C', Tm1: '#D57DA3', Tm2: '#a6761d'
 #YES-NO options
 plot_data = True
-save_figures = False
+save_figures = True
 exclude_outliers = True # Plot variability without outliers
 stacked_plots = False 
 
