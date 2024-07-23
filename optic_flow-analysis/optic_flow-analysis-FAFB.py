@@ -152,6 +152,7 @@ df_grid['new_p'] = new_p_values
 
 # "manual_labels" column ids
 labels = df_grid.column_id.tolist() 
+labels = None
 
 #%%
 ## Ploting data on the grid in a loop
@@ -159,7 +160,7 @@ labels = df_grid.column_id.tolist()
 
 # Initializiny variables before the loop
 angles_df_dict = {}
-to_cell_of_interest_ls = ['T4a','T4b']
+to_cell_of_interest_ls = ['T4a','T4b','T4c','T4d']
 
 for cell in to_cell_of_interest_ls:
 
@@ -187,19 +188,19 @@ for cell in to_cell_of_interest_ls:
     fig, ax, hexagons = plot_hex_grid(original_p, original_q, hex_size=0.5, spacing=1.0, fig_size=(20, 20), labels=labels, label_type='manual_labels', text_size=6)
 
     # Example to color hexagons based on a condition
-    for p_x, p_y in p:
-        color_in_p = p_x
-        color_in_q = p_y
-        for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
-            if x_pos == color_in_p and y_pos == color_in_q:
-                hexagon.set_facecolor('g')
+    # for p_x, p_y in p:
+    #     color_in_p = p_x
+    #     color_in_q = p_y
+    #     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
+    #         if x_pos == color_in_p and y_pos == color_in_q:
+    #             hexagon.set_facecolor('lightgreen')
 
-    for q_x, q_y in q:
-        color_in_p = q_x
-        color_in_q = q_y
-        for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
-            if x_pos == color_in_p and y_pos == color_in_q:
-                hexagon.set_facecolor('c')
+    # for q_x, q_y in q:
+    #     color_in_p = q_x
+    #     color_in_q = q_y
+    #     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
+    #         if x_pos == color_in_p and y_pos == color_in_q:
+    #             hexagon.set_facecolor('lightblue')
                 
 
     for h_x, h_y in h:
@@ -207,15 +208,15 @@ for cell in to_cell_of_interest_ls:
         color_in_q = h_y
         for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
             if x_pos == color_in_p and y_pos == color_in_q:
-                hexagon.set_facecolor('y')
+                hexagon.set_facecolor('lightyellow')
 
 
-    for v_x, v_y in v:
-        color_in_p = v_x
-        color_in_q = v_y
-        for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
-            if x_pos == color_in_p and y_pos == color_in_q:
-                hexagon.set_facecolor('grey')
+    # for v_x, v_y in v:
+    #     color_in_p = v_x
+    #     color_in_q = v_y
+    #     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
+    #         if x_pos == color_in_p and y_pos == color_in_q:
+    #             hexagon.set_facecolor('lightgrey')
                 
 
     '''
@@ -261,9 +262,9 @@ for cell in to_cell_of_interest_ls:
 
     # Saving plot
     if save_figures:
-        figure_title = f'\Grid_plot_vectors_{from_cell_of_interest}_to_{to_cell_of_interest}.pdf'
+        figure_title = f'\Grid_plot_vectors_{from_cell_of_interest}-home-{to_cell_of_interest}.pdf'
         fig.savefig(save_path+figure_title)
-        print('FIGURE: Visualization of absolute counts plotted as stacked bars and saved')
+        print('FIGURE: Visualization vectors on the 2D grid plotted')
     plt.close(fig)
 
 
@@ -337,7 +338,7 @@ for cell in to_cell_of_interest_ls:
 
 # Saving plot
 if save_figures:
-    figure_title = f'\Vectors_histogram_{from_cell_of_interest}_to_T4.pdf'
+    figure_title = f'\Vectors_histogram_{from_cell_of_interest}-home_T4.pdf'
     fig.savefig(save_path+figure_title)
-    print('FIGURE: Visualization of absolute counts plotted as stacked bars and saved')
+    print('FIGURE: Visualization of vectors angles plotted')
 plt.close(fig)

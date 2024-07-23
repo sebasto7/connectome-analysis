@@ -7,7 +7,9 @@ Created on Mon July 22 11:35:00 2024
 
 helper for the optic flow analysis of DS cells in FAFB data set
 """
-
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.patches import Polygon
 
 def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10):
     fig, ax = plt.subplots(figsize=fig_size)
