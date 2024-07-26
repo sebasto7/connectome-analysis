@@ -38,6 +38,8 @@ color_dict = {'T4a':'g','T4b':'b', 'T4c':'r', 'T4d':'y'}
 ## General settings
 
 cell_for_grid = 'Mi1'
+to_cell_of_interest_ls = ['T4a','T4b','T4c','T4d']
+correlator = 'HR-BL' # 'BL' for Barlow-Levick, 'HR' for Hassenstein-Reichert, 'HR-BL' for the combination
 
 #%%
 
@@ -160,28 +162,72 @@ labels = None
 
 # Initializiny variables before the loop
 angles_df_dict = {}
-to_cell_of_interest_ls = ['T4a','T4b','T4c','T4d']
 
 for cell in to_cell_of_interest_ls:
 
-    # Getting inputs of the cell of interest
-    from_cell_of_interest = 'Mi4'
     to_cell_of_interest = cell
 
-    cell_of_interest_inputs = connections_extended[(connections_extended.to_cell_type == to_cell_of_interest) & (connections_extended.from_cell_type == from_cell_of_interest)].copy()
-    cell_of_interest_inputs_sorted = cell_of_interest_inputs.sort_values(by='to_cell_id')
+    # Getting inputs of the cell of interest
+    BL_cell_of_interest = 'Mi4'
+
+    cell_of_interest_inputs = connections_extended[(connections_extended.to_cell_type == to_cell_of_interest) & (connections_extended.from_cell_type == BL_cell_of_interest)].copy()
 
     # Sort by to_cell_id and synapses in descending order
-    cell_of_interest_inputs_sorted = cell_of_interest_inputs_sorted.sort_values(by=['to_cell_id', 'synapses'], ascending=[True, False])
+    cell_of_interest_inputs_sorted = cell_of_interest_inputs.sort_values(by=['to_cell_id', 'synapses'], ascending=[True, False])
 
     # Group by to_cell_id and take the first row for each group (highest synapse value)
-    unique_highest_inputs = cell_of_interest_inputs_sorted.drop_duplicates(subset='to_cell_id', keep='first')
+    BL_unique_highest_inputs = cell_of_interest_inputs_sorted.drop_duplicates(subset='to_cell_id', keep='first').copy()
 
     #Dropping 'not assigned' rows
-    unique_highest_inputs_filtered = unique_highest_inputs[unique_highest_inputs.to_column_id != 'not assigned'].copy()
+    BL_unique_highest_inputs_filtered = BL_unique_highest_inputs[BL_unique_highest_inputs.to_column_id != 'not assigned'].copy()
 
     # Find the duplicates with the same to_cell_id and synapse value
-    duplicates_in_highest_inputs = cell_of_interest_inputs_sorted[cell_of_interest_inputs_sorted.duplicated(subset=['to_cell_id', 'synapses'], keep=False)]
+    BL_duplicates_in_highest_inputs = cell_of_interest_inputs_sorted[cell_of_interest_inputs_sorted.duplicated(subset=['to_cell_id', 'synapses'], keep=False)]
+
+    # Changing column names for clarity
+    BL_unique_highest_inputs_filtered.rename(columns={'from_cell_id': 'BL_cell_id', 'from_cell_type': 'BL_cell_type', 'from_column_id': 'BL_column_id', 
+                                                    'to_cell_id': 'home_cell_id', 'to_cell_type': 'home_cell_type','to_column_id': 'home_column_id'}, inplace = True)
+    # Comvertions to strings
+    BL_unique_highest_inputs_filtered['BL_cell_id'] = BL_unique_highest_inputs_filtered['BL_cell_id'].apply(str)
+
+
+    # Getting inputs of the cell of interest
+    HR_cell_of_interest = 'Mi9'
+
+    cell_of_interest_inputs = connections_extended[(connections_extended.to_cell_type == to_cell_of_interest) & (connections_extended.from_cell_type == HR_cell_of_interest)].copy()
+
+    # Sort by to_cell_id and synapses in descending order
+    cell_of_interest_inputs_sorted = cell_of_interest_inputs.sort_values(by=['to_cell_id', 'synapses'], ascending=[True, False])
+
+    # Group by to_cell_id and take the first row for each group (highest synapse value)
+    HR_unique_highest_inputs = cell_of_interest_inputs_sorted.drop_duplicates(subset='to_cell_id', keep='first')
+
+    #Dropping 'not assigned' rows
+    HR_unique_highest_inputs_filtered = HR_unique_highest_inputs[HR_unique_highest_inputs.to_column_id != 'not assigned'].copy()
+
+    # Find the duplicates with the same to_cell_id and synapse value
+    HR_duplicates_in_highest_inputs = cell_of_interest_inputs_sorted[cell_of_interest_inputs_sorted.duplicated(subset=['to_cell_id', 'synapses'], keep=False)]
+
+    # Changing column names for clarity
+    HR_unique_highest_inputs_filtered.rename(columns={'from_cell_id': 'HR_cell_id', 'from_cell_type': 'HR_cell_type', 'from_column_id': 'HR_column_id', 
+                                                    'to_cell_id': 'home_cell_id', 'to_cell_type': 'home_cell_type','to_column_id': 'home_column_id'}, inplace = True)
+    # Comvertions to strings
+    HR_unique_highest_inputs_filtered['HR_cell_id'] = HR_unique_highest_inputs_filtered['HR_cell_id'].apply(str)
+
+
+    ## Combining the two correlators
+
+    # Merge data frames of both correlators (with inner join to keep only the rows with keys that are present in both DataFrames)
+    HR_BL_unique_highest_inputs_filtered = BL_unique_highest_inputs_filtered.merge(
+        HR_unique_highest_inputs_filtered[['HR_cell_id', 'HR_cell_type','HR_column_id','home_cell_id']],
+        how='inner',
+        left_on='home_cell_id',
+        right_on='home_cell_id'
+    )
+
+    #Dropping 'not assigned' rows
+    HR_BL_unique_highest_inputs_filtered = HR_BL_unique_highest_inputs_filtered[HR_BL_unique_highest_inputs_filtered.BL_column_id != 'not assigned'].copy()
+    HR_BL_unique_highest_inputs_filtered = HR_BL_unique_highest_inputs_filtered[HR_BL_unique_highest_inputs_filtered.HR_column_id != 'not assigned'].copy()
 
 
     ## Plotting on the 2D lattice: check access to each point and axis
@@ -230,8 +276,18 @@ for cell in to_cell_of_interest_ls:
     '''
 
     #Preparing the vectors to draw
-    start_ids = [int(x) for x in unique_highest_inputs_filtered.to_column_id.tolist()]
-    end_ids = [int(x) for x in unique_highest_inputs_filtered.from_column_id.tolist()] 
+    if correlator == 'BL':
+        start_ids = [int(x) for x in HR_BL_unique_highest_inputs_filtered.home_column_id.tolist()]
+        end_ids = [int(x) for x in HR_BL_unique_highest_inputs_filtered.BL_column_id.tolist()] 
+        from_cell_of_interest = BL_cell_of_interest
+    elif correlator == 'HR':
+        start_ids = [int(x) for x in HR_BL_unique_highest_inputs_filtered.HR_column_id.tolist()]
+        end_ids = [int(x) for x in HR_BL_unique_highest_inputs_filtered.home_column_id.tolist()]
+        from_cell_of_interest = HR_cell_of_interest
+    elif correlator == 'HR-BL':
+        start_ids = [int(x) for x in HR_BL_unique_highest_inputs_filtered.HR_column_id.tolist()]
+        end_ids = [int(x) for x in HR_BL_unique_highest_inputs_filtered.BL_column_id.tolist()]  
+        from_cell_of_interest = [HR_cell_of_interest,BL_cell_of_interest]
 
     start_coords_ls = []
     end_coords_ls = []
@@ -257,12 +313,12 @@ for cell in to_cell_of_interest_ls:
         draw_vector(ax, x_start, y_start, x_end, y_end, color=color_dict[to_cell_of_interest])
 
 
-
+    plt.title(f'{correlator} correlator, {to_cell_of_interest}')
     #plt.show()
 
     # Saving plot
     if save_figures:
-        figure_title = f'\Grid_plot_vectors_{from_cell_of_interest}-home-{to_cell_of_interest}.pdf'
+        figure_title = f'\Grid_plot_vectors_{from_cell_of_interest}-home-{to_cell_of_interest}_correlator-{correlator}.pdf'
         fig.savefig(save_path+figure_title)
         print('FIGURE: Visualization vectors on the 2D grid plotted')
     plt.close(fig)
@@ -334,11 +390,12 @@ for cell in to_cell_of_interest_ls:
 
     # Show plots
     plt.tight_layout()
+    plt.title(f'{correlator} correlator, {to_cell_of_interest_ls}')
 #plt.show()
 
 # Saving plot
 if save_figures:
-    figure_title = f'\Vectors_histogram_{from_cell_of_interest}-home_T4.pdf'
+    figure_title = f'\Vectors_histogram_{from_cell_of_interest}-home_T4_correlator-{correlator}.pdf'
     fig.savefig(save_path+figure_title)
     print('FIGURE: Visualization of vectors angles plotted')
 plt.close(fig)
