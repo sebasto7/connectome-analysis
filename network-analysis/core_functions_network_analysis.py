@@ -92,7 +92,7 @@ def graph_creation(Table, user_parameters,microcircuit,by_instance = False):
 
 
     if microcircuit:
-        neurons = user_parameters['defined_microcirtuit'] 
+        neurons = user_parameters['defined_microcircuit'] 
         Table = Table[(Table['PreSynapticNeuron'].isin(neurons)) & (Table['PostSynapticNeuron'].isin(neurons))].copy()
     else:
         neurons = list(np.unique(np.concatenate((presynaptic_neurons,postsynaptic_neurons), axis = 0)))
@@ -487,7 +487,7 @@ def graph_plot(Weights, user_parameters, transformation_function):
 
 def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,save_figures,start_node_ls,last_node_ls):
     '''
-    
+
     '''
 
     #message_str = '\n >>>>>>> All paths in a distance of max %d neurons' % (user_parameters['_cutoff'])
@@ -520,10 +520,13 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
             highlighted_path = cur_path
             
             temp_weigth  = 0
-            for i in range(len(highlighted_path)-1):
-                temp_weigth = temp_weigth +(Weights[(highlighted_path[i],highlighted_path[i+1])])
-            weigth_path = round(temp_weigth/(len(highlighted_path)-1))
-            path_weigth_list.append(weigth_path)
+            if len(highlighted_path) > 1:
+                for i in range(len(highlighted_path)-1):
+                    temp_weigth = temp_weigth +(Weights[(highlighted_path[i],highlighted_path[i+1])])
+                weigth_path = round(temp_weigth/(len(highlighted_path)-1))
+                path_weigth_list.append(weigth_path)
+            else:
+                continue
 
         
             
@@ -560,8 +563,7 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
                 path_fig.suptitle('Node-to-node path. Averaged weigth: %.1f  %s ' % (weigth_path,user_parameters['graph']))
                 nx.draw_networkx_labels(G,pos)
                 plt.axis('equal')
-
-            
+        
                 if save_figures:
                     name_nodes = user_parameters['start_node'] +' to ' + user_parameters['last_node']
                     save_dir = dirPath +'\\figures\\paths\\' + name_nodes + '\\'
@@ -575,8 +577,8 @@ def node_to_node_graph_analysis_and_plot(G, Weights, user_parameters,dirPath,sav
             # Creating paths dataframe
             cur_df = pd.DataFrame(list(zip(start_node_list,last_node_list,node_to_lode_list,path_list, path_weigth_list)),
                    columns =['Start_node','Last_node','Node_to_node' ,'Path', 'Weigth'])
-        # Concatenating dataframes    
-        path_df = path_df.append(cur_df)
+            # Concatenating dataframes    
+            path_df = path_df._append(cur_df)
                     
     #Normalizations and other calculations
     path_df['Norm_weigth'] = list(map(lambda x, y: y/(len(x)-1), path_df['Path'], path_df['Weigth'])) # Normalizing the weigth by path length
@@ -772,22 +774,22 @@ def input_output_analysis(Weights,neuron_ls):
         # Input and output dataframes for all neurons
         temp_input_neurons_df = pd.DataFrame(input_neurons_dict, index=[0])
         temp_input_neurons_df = temp_input_neurons_df.rename(index={0:neuron})
-        final_input_df=final_input_df.append(temp_input_neurons_df)
+        final_input_df=final_input_df._append(temp_input_neurons_df)
         
         temp_output_neurons_df = pd.DataFrame(output_neurons_dict, index=[0])
         temp_output_neurons_df = temp_output_neurons_df.rename(index={0:neuron})
-        final_output_df=final_output_df.append(temp_output_neurons_df)
+        final_output_df=final_output_df._append(temp_output_neurons_df)
         
         # Input and output dataframes ranked 
         temp_input_ranked_df = temp_input_neurons_df.sort_values(by = neuron, axis=1, ascending=False)
         for i, column in enumerate(temp_input_ranked_df):
             temp_input_ranked_df.rename(columns = {column:i+1}, inplace = True)
-        final_input_ranked_df=final_input_ranked_df.append(temp_input_ranked_df)
+        final_input_ranked_df=final_input_ranked_df._append(temp_input_ranked_df)
         
         temp_output_ranked_df = temp_output_neurons_df.sort_values(by = neuron, axis=1, ascending=False)
         for i, column in enumerate(temp_output_ranked_df):
             temp_output_ranked_df.rename(columns = {column:i+1}, inplace = True)
-        final_output_ranked_df=final_output_ranked_df.append(temp_output_ranked_df)
+        final_output_ranked_df=final_output_ranked_df._append(temp_output_ranked_df)
         
     # Calculating proportions / normalizing data to the sum of all inputs or outputs
     final_input_ranked_norm_df = final_input_ranked_df.copy()  
@@ -1090,9 +1092,9 @@ def direct_indirect_connections_plot(number_partners_dict,length_dict,norm_lengt
     fig_s, axes_s = plt.subplots(nrows= 1,ncols=2,figsize=(20*cm, 10*cm)) # All together
 
     weigth_df_bar = weigth_df.groupby(['Neuron','Connection'])[variable_weigth].sum().unstack().fillna(0)
-    weigth_df_bar.reindex(user_parameters['defined_microcirtuit']).plot(ax=axes_s[0],kind='bar', stacked=True)
+    weigth_df_bar.reindex(user_parameters['defined_microcircuit']).plot(ax=axes_s[0],kind='bar', stacked=True)
     partners_df_bar = partners_df.groupby(['Neuron','Connection'])[variable_partners].sum().unstack().fillna(0)
-    partners_df_bar.reindex(user_parameters['defined_microcirtuit']).plot(ax=axes_s[1],kind='bar', stacked=True)
+    partners_df_bar.reindex(user_parameters['defined_microcircuit']).plot(ax=axes_s[1],kind='bar', stacked=True)
 
     axes_s[0].set_ylabel('Synaptic count', fontsize = 8)
     axes_s[1].set_ylabel('Partners', fontsize = 8)

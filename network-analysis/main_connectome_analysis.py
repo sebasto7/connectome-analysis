@@ -93,7 +93,7 @@ def main_analysis(user_parameters):
 
             # Use the fetch_custom method to execute the query
             add_results = c.fetch_custom(q)
-            results = results.append(add_results)
+            results = results._append(add_results)
 
 
 
@@ -174,18 +174,16 @@ def main_analysis(user_parameters):
 
 
     #%% Single source shortest path  (SSSP) analysis with NetwrokX
+    # So far just printing the information. If interested, consider to save any variable and generate desired plots
+    length, path = nx.single_source_dijkstra(G, user_parameters['start_node'])
 
-    # >>> Relevant message: currently not interesting to print it out, moving to show it in a different way. Therefore is all commented out
+    path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items())
+    message_str = '\n >>>>>>> All paths: \n\n%s can reach a neuron via [shortest path]: \n\n%s ' % (user_parameters['start_node'], path_str)
+    print(message_str)
 
-    # length, path = nx.single_source_dijkstra(G, user_parameters['start_node'])
-
-    # path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items())
-    # message_str = '\n >>>>>>> All paths: \n\n%s can reach a neuron via [shortest path]: \n\n%s ' % (user_parameters['start_node'], path_str)
-    # print(message_str)
-
-    # path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items() if k == user_parameters['last_node'])
-    # message_str = '\n >>>>>>> Single path: \n\n%s can reach %s via [shortest path]: \n\n%s ' % (user_parameters['start_node'],user_parameters['last_node'], path_str)
-    # print(message_str)
+    path_str = ''.join('%s: %s ; ' % (k,v) for k,v in path.items() if k == user_parameters['last_node'])
+    message_str = '\n >>>>>>> Single path: \n\n%s can reach %s via [shortest path]: \n\n%s ' % (user_parameters['start_node'],user_parameters['last_node'], path_str)
+    print(message_str)
 
 
     #%% Node to node analysis

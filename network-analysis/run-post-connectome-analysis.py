@@ -315,15 +315,6 @@ bar_axes_c[0,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
 bar_axes_c[0,0].spines['right'].set_visible(False)
 bar_axes_c[0,0].spines['top'].set_visible(False) 
 
-# _color = 'purple'
-# sorted_neurons = all_columns_centrality_df.groupby("Neuron")["Pagerank eigenvector"].mean().reset_index().sort_values(by="Pagerank eigenvector", ascending=False)
-# _order = sorted_neurons["Neuron"].tolist()
-# sns.barplot(ax = bar_axes_c[0,1],x = 'Neuron', y = 'Pagerank eigenvector', data = cur_df, order=_order,
-#             color=_color, ci = _ci)
-# bar_axes_c[0,1].set_xticklabels(_order, rotation = 90, fontsize = 7)
-# bar_axes_c[0,1].spines['right'].set_visible(False)
-# bar_axes_c[0,1].spines['top'].set_visible(False) 
-
 _color = 'tomato'
 sorted_neurons = all_columns_centrality_df.groupby("Neuron")["IN-Degree"].mean().reset_index().sort_values(by="IN-Degree", ascending=False)
 _order = sorted_neurons["Neuron"].tolist()
@@ -342,15 +333,6 @@ bar_axes_c[1,0].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
 bar_axes_c[1,0].spines['right'].set_visible(False)
 bar_axes_c[1,0].spines['top'].set_visible(False) 
 
-# _color = 'gold'
-# sorted_neurons = all_columns_centrality_df.groupby("Neuron")["Closeness"].mean().reset_index().sort_values(by="Closeness", ascending=False)
-# _order = sorted_neurons["Neuron"].tolist()
-# sns.barplot(ax = bar_axes_c[1,1],x = 'Neuron', y = 'Closeness', data = cur_df, order=_order,
-#             color=_color, ci = _ci)
-# bar_axes_c[1,1].set_xticklabels(_order, rotation = 90, fontsize = _fontsize)
-# bar_axes_c[1,1].spines['right'].set_visible(False)
-# bar_axes_c[1,1].spines['top'].set_visible(False) 
-
 _color = 'tomato'
 sorted_neurons = all_columns_centrality_df.groupby("Neuron")["OUT-Degree"].mean().reset_index().sort_values(by="OUT-Degree", ascending=False)
 _order = sorted_neurons["Neuron"].tolist()
@@ -368,34 +350,6 @@ if save_figures:
     # bar_fig_c.savefig(save_dir +'\centrality_all_columns_2.pdf')
     # plt.close(bar_fig_c)
     pass
-
-############################ Pathplot with seaborn ##########################
-
-# Temp commented out
-# bar_fig_p, bar_axes_p = plt.subplots(nrows= 1,ncols=1,figsize=(40*cm, 10*cm)) # All together
-
-# if node_to_node_to_plot[0:2] == 'L1' :
-#     _color = '#E64D00'
-# elif  node_to_node_to_plot[0:2] == 'L2' :
-#     _color = '#8019E8'
-# elif node_to_node_to_plot[0:2] == 'L3' :
-#     _color = '#1B9E77'
-
-# # cur_df = all_columns_path_df
-# cur_df = all_columns_path_df[all_columns_path_df['Node_to_node'] == node_to_node_to_plot]
-# _order=cur_df.sort_values('Weigth',ascending = False).Path
-# _order = _order.drop_duplicates(keep='first', inplace=False)
-# sns.barplot(ax = bar_axes_p,x = 'Path', y = 'Weigth', data = cur_df, order=_order,
-#             color=_color, ci = _ci)
-# plt.xticks(rotation=90)
-# _title = 'All columns ,' + graph + ': ' + ' paths ' + node_to_node_to_plot
-# bar_fig_p.suptitle(_title, fontsize = 12)
-
-# bar_axes_p.spines['right'].set_visible(False)
-# bar_axes_p.spines['top'].set_visible(False) 
-# plt.show()
-# plt.close()
-
 
 
 
