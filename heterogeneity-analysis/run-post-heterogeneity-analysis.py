@@ -31,7 +31,7 @@ import navis
 #%% Custom functions 
 
 #Importing custom functions from helper file
-from helper_nature import cosine_similarity_and_clustering, remove_outliers, perform_levene_test, determine_subgroup
+from heterogeneyty_analysis_helper import cosine_similarity_and_clustering, remove_outliers, perform_levene_test, determine_subgroup
 
 
 

@@ -24,7 +24,7 @@ from openpyxl import load_workbook
 import os
 
 #Importing custom functions from helper file
-from helper_nature import replace_outliers_with_nan, calculate_correlation_and_p_values, cosine_similarity_and_clustering
+from heterogeneyty_analysis_helper import replace_outliers_with_nan, calculate_correlation_and_p_values, cosine_similarity_and_clustering
 
 #%% 
 ############################################# GENERAL SETTINGS: PLOTS #########################################

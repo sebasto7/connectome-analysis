@@ -206,3 +206,123 @@ def filter_points(points, threshold_distance):
 
     return filtered_points
 
+
+def update_dataframe_single_column(source_df, target_df, reference_column):
+    """
+    Update the rows of the target DataFrame with corresponding rows from the source DataFrame
+    based on a common reference column.
+
+    Args:
+        source_df (pd.DataFrame): The DataFrame containing the updated data.
+        target_df (pd.DataFrame): The DataFrame to be updated.
+        reference_column (str): The name of the column to be used as the reference for matching rows.
+
+    Returns:
+        pd.DataFrame: The updated target DataFrame where rows have been replaced based on the reference column.
+    """
+    # Create a dictionary mapping reference column values to corresponding rows in the source DataFrame
+    reference_dict = source_df.groupby(reference_column).first().reset_index().to_dict(orient='records')
+    reference_dict = {row[reference_column]: row for row in reference_dict}
+
+    # Update the target DataFrame based on the reference column
+    for i, row in target_df.iterrows():
+        ref = row[reference_column]
+        if ref in reference_dict:
+            source_row = reference_dict[ref]
+            target_df.loc[i] = source_row
+
+    return target_df
+
+    def update_dataframe(source_df, target_df, reference_column1, reference_column2):
+    """
+    Update the rows of the target DataFrame with corresponding rows from the source DataFrame
+    based on two reference columns.
+
+    Args:
+        source_df (pd.DataFrame): The DataFrame containing the updated data.
+        target_df (pd.DataFrame): The DataFrame to be updated.
+        reference_column1 (str): The name of the first column used as the reference for matching rows.
+        reference_column2 (str): The name of the second column used as the reference for matching rows.
+
+    Returns:
+        pd.DataFrame: The updated target DataFrame where rows have been replaced based on the reference columns.
+    """
+    # Create a dictionary mapping pairs of reference column values to corresponding rows in the source DataFrame
+    reference_columns = [reference_column1, reference_column2]
+    reference_dict = source_df.groupby(reference_columns).first().reset_index().to_dict(orient='records')
+    reference_dict = {(row[reference_column1], row[reference_column2]): row for row in reference_dict}
+
+    # Update the target DataFrame based on the reference columns
+    for i, row in target_df.iterrows():
+        ref1 = row[reference_column1]
+        ref2 = row[reference_column2]
+        if (ref1, ref2) in reference_dict:
+            source_row = reference_dict[(ref1, ref2)]
+            target_df.loc[i] = source_row
+
+    return target_df
+
+
+    def find_center_point(points, threshold):
+    """
+    Find the geometric center point of a subset of points that are within a given average distance threshold,
+    and determine the closest point to this center.
+
+    Args:
+        points (list or np.ndarray): A list or NumPy array of shape (n, 3), where each entry is a point in 3D space.
+        threshold (float): The maximum average distance from which points are considered valid for calculating the center.
+
+    Returns:
+        tuple: A tuple containing:
+            - center_point (list): The geometric center point of the valid subset of points, rounded to one decimal place.
+            - closest_point (list): The point from the valid subset that is closest to the computed center point.
+    """
+    if isinstance(points, list):
+        points = np.array(points)
+
+    # Calculate the distances between each point and all other points
+    distances = np.linalg.norm(points[:, np.newaxis] - points, axis=2)
+
+    # Calculate the average distance for each point
+    avg_distances = np.mean(distances, axis=1)
+
+    # Find the indices of points within the threshold distance
+    valid_indices = np.where(avg_distances < threshold)[0]
+
+    # Check if there are any valid points
+    if len(valid_indices) > 0:
+        # Calculate the geometric center of valid points
+        center_point = np.mean(points[valid_indices], axis=0)
+        # Round the center point to one decimal place
+        center_point = np.round(center_point, decimals=1)
+        
+        # Find the closest point to the center
+        closest_point_index = np.argmin(np.linalg.norm(points[valid_indices] - center_point, axis=1))
+        closest_point = points[valid_indices][closest_point_index]
+    else:
+        # Default values when no points are within the threshold
+        center_point = np.array([0, 0, 0])
+        closest_point = np.array([0, 0, 0])
+
+    return center_point.tolist(), closest_point.tolist()
+
+
+def save_list_to_file(file_path, input_list):
+    """
+    Save a list of items to a CSV file, with each item on a new line.
+
+    Args:
+        file_path (str): The path to the file where the list will be saved. If the file already exists, it will be overwritten.
+        input_list (list): A list of items to be saved to the CSV file.
+
+    Returns:
+        None
+    """
+    df = pd.DataFrame(input_list, columns=['Items'])
+    df.to_csv(file_path, header=False, index=False)
+
+
+
+
+
+
