@@ -58,7 +58,8 @@ def calculate_new_p_values(original_x, original_y, start_key=-16, end_key=17, re
     return new_x_values
 
 
-def add_space_in_between(num_negatives, num_positives, space, key_list):
+def add_space_in_between(min_max_coordinates_dict,parameters_dict, key_list):
+    
     """
     Adds space between negative and positive values and returns a new list based on a provided key list.
 
@@ -78,6 +79,13 @@ def add_space_in_between(num_negatives, num_positives, space, key_list):
     new_list : list
         A list of values generated based on the key list with added spacing.
     """
+
+    #Unpacking values from dictionaries
+    num_negatives = min_max_coordinates_dict['min_p_value'] 
+    num_positives = min_max_coordinates_dict['max_p_value'] 
+    space = parameters_dict['space']
+
+    #Main functionality
     num_negatives = num_negatives*-1
     negative_numbers = [-space * i for i in range(num_negatives, 0, -1)]
     positive_numbers = [space * i for i in range(1, num_positives + 1)]
@@ -95,7 +103,7 @@ def add_space_in_between(num_negatives, num_positives, space, key_list):
     
     return new_list
 
-def getting_correlators_start_end_coordinates(corr_ls, df_grid, HR_BL_unique_highest_inputs_filtered):
+def getting_correlators_start_end_coordinates(corr_ls, df_grid, HR_BL_unique_highest_inputs_filtered, map_type):
     for corr_i in corr_ls:
         if corr_i == 'BL':
             start_ids = HR_BL_unique_highest_inputs_filtered.home_column_id.tolist()
@@ -111,17 +119,31 @@ def getting_correlators_start_end_coordinates(corr_ls, df_grid, HR_BL_unique_hig
         start_ids = [int(x) for x in start_ids]
         end_ids = [int(x) for x in end_ids]
 
-        # Getting vector coordinates    
-        start_coords_ls = []
-        end_coords_ls = []
-        for start_id, end_id in zip(start_ids, end_ids):
-            start_id_p = df_grid[df_grid.column_id == str(start_id)].new_centered_p.values[0]
-            start_id_q = df_grid[df_grid.column_id == str(start_id)].q.values[0]
-            start_coords_ls.append((start_id_p, start_id_q))
-
-            end_id_p = df_grid[df_grid.column_id == str(end_id)].new_centered_p.values[0]
-            end_id_q = df_grid[df_grid.column_id == str(end_id)].q.values[0]
-            end_coords_ls.append((end_id_p, end_id_q))
+        if map_type == 'hexagonal':
+            # Getting vector coordinates    
+            start_coords_ls = []
+            end_coords_ls = []
+            for start_id, end_id in zip(start_ids, end_ids):
+                start_id_p = df_grid[df_grid.column_id == str(start_id)].new_centered_p.values[0]
+                start_id_q = df_grid[df_grid.column_id == str(start_id)].q.values[0]
+                start_coords_ls.append((start_id_p, start_id_q))
+    
+                end_id_p = df_grid[df_grid.column_id == str(end_id)].new_centered_p.values[0]
+                end_id_q = df_grid[df_grid.column_id == str(end_id)].q.values[0]
+                end_coords_ls.append((end_id_p, end_id_q))
+        elif map_type == 'regular':
+            # Getting vector coordinates    
+            start_coords_ls = []
+            end_coords_ls = []
+            for start_id, end_id in zip(start_ids, end_ids):
+                start_id_p = df_grid[df_grid.column_id == str(start_id)].p.values[0]
+                start_id_q = df_grid[df_grid.column_id == str(start_id)].q.values[0]
+                start_coords_ls.append((start_id_p, start_id_q))
+    
+                end_id_p = df_grid[df_grid.column_id == str(end_id)].p.values[0]
+                end_id_q = df_grid[df_grid.column_id == str(end_id)].q.values[0]
+                end_coords_ls.append((end_id_p, end_id_q))
+            
 
         # Saving start and end IDs for BL, HR, and HR-BL
         if corr_i == 'BL':
@@ -192,6 +214,92 @@ def getting_correlators_angles(points, HR_BL_unique_highest_inputs_filtered, cor
     return HR_BL_unique_highest_inputs_filtered  # Returning the modified DataFrame
 
 
+def get_input_fractions_and_norm(ol_connections, HR_BL_unique_highest_inputs_filtered):
+    ## Getting all synaptic data 
+    total_synapse_num = ol_connections.groupby('to_cell_id')['synapses'].agg('sum')
+
+    ## Getting input weights
+    # Map the total synapse numbers to the corresponding 'home_cell_id' in the filtered DataFrame
+    HR_BL_unique_highest_inputs_filtered['total_input_synapses'] = HR_BL_unique_highest_inputs_filtered['home_cell_id'].map(total_synapse_num)
+
+    # Calculate the actual input fractions
+    HR_BL_unique_highest_inputs_filtered['BL_fraction'] = HR_BL_unique_highest_inputs_filtered['BL_synapses'] / HR_BL_unique_highest_inputs_filtered['total_input_synapses']
+    HR_BL_unique_highest_inputs_filtered['HR_fraction'] = HR_BL_unique_highest_inputs_filtered['HR_synapses'] / HR_BL_unique_highest_inputs_filtered['total_input_synapses']
+
+    # Normalizing absolute synapse number
+    _max_norm_BL_synapses_ls = HR_BL_unique_highest_inputs_filtered['BL_synapses'] / HR_BL_unique_highest_inputs_filtered['BL_synapses'].max()
+    HR_BL_unique_highest_inputs_filtered['max_norm_BL_synapses'] = _max_norm_BL_synapses_ls
+
+    _max_norm_HR_synapses_ls = HR_BL_unique_highest_inputs_filtered['HR_synapses'] / HR_BL_unique_highest_inputs_filtered['HR_synapses'].max()
+    HR_BL_unique_highest_inputs_filtered['max_norm_HR_synapses'] = _max_norm_HR_synapses_ls
+
+    HR_BL_unique_highest_inputs_filtered['HR-BL_synapses'] = HR_BL_unique_highest_inputs_filtered['BL_synapses'] + HR_BL_unique_highest_inputs_filtered['HR_synapses']
+    _max_norm_HR_BL_synapses_ls = HR_BL_unique_highest_inputs_filtered['HR-BL_synapses'] / HR_BL_unique_highest_inputs_filtered['HR-BL_synapses'].max()
+    HR_BL_unique_highest_inputs_filtered['max_norm_HR-BL_synapses'] = _max_norm_HR_BL_synapses_ls
+
+    # Normalizing input weights
+    _max_norm_BL_input_fraction_ls = HR_BL_unique_highest_inputs_filtered['BL_fraction'] / HR_BL_unique_highest_inputs_filtered['BL_fraction'].max()
+    HR_BL_unique_highest_inputs_filtered['max_norm_BL_input_fraction'] = _max_norm_BL_input_fraction_ls
+
+    _max_norm_HR_input_fraction_ls = HR_BL_unique_highest_inputs_filtered['HR_fraction'] / HR_BL_unique_highest_inputs_filtered['HR_fraction'].max()
+    HR_BL_unique_highest_inputs_filtered['max_norm_HR_input_fraction'] = _max_norm_HR_input_fraction_ls
+
+    # Calculate input weights considering only HR (Mi9) and BL (Mi4) inputs for the total number of synapses
+    HR_BL_sum = HR_BL_unique_highest_inputs_filtered['BL_synapses'] + HR_BL_unique_highest_inputs_filtered['HR_synapses']
+    HR_BL_unique_highest_inputs_filtered['BL_input_fraction_HR-BL'] = HR_BL_unique_highest_inputs_filtered['BL_synapses'] / HR_BL_sum 
+    HR_BL_unique_highest_inputs_filtered['HR_input_fraction_HR-BL'] = HR_BL_unique_highest_inputs_filtered['HR_synapses'] / HR_BL_sum 
+
+
+
+def get_weighted_correlator(HR_BL_unique_highest_inputs_filtered):
+    # Based on each correlator input fraction concerning each other, calculate the weighted vector sum
+    df = HR_BL_unique_highest_inputs_filtered
+    HR_weight_variable = 'HR_input_fraction_HR-BL'
+    BL_weight_variable = 'BL_input_fraction_HR-BL'
+
+    # Convert angles from degrees to radians
+    df['BL_angle_rad'] = np.deg2rad(df['BL_angle'])
+    df['HR_angle_rad'] = np.deg2rad(df['HR_angle'])
+
+    # Calculate x and y components of BL and HR vectors
+    df['BL_x'] = df[BL_weight_variable] * np.cos(df['BL_angle_rad'])
+    df['BL_y'] = df[BL_weight_variable] * np.sin(df['BL_angle_rad'])
+    df['HR_x'] = df[HR_weight_variable] * np.cos(df['HR_angle_rad'])
+    df['HR_y'] = df[HR_weight_variable] * np.sin(df['HR_angle_rad'])
+
+    # Compute resultant x and y components by summing the BL and HR components
+    HR_BL_unique_highest_inputs_filtered['resultant_x'] = df['BL_x'] + df['HR_x']
+    HR_BL_unique_highest_inputs_filtered['resultant_y'] = df['BL_y'] + df['HR_y']
+
+    # Calculate the average x and y components
+    avg_resultant_x = HR_BL_unique_highest_inputs_filtered['resultant_x'].mean()
+    avg_resultant_y = HR_BL_unique_highest_inputs_filtered['resultant_y'].mean()
+
+    # Convert the average x and y components back to polar coordinates
+    avg_resultant_radius = np.sqrt(avg_resultant_x**2 + avg_resultant_y**2)
+    avg_resultant_angle = np.arctan2(avg_resultant_y, avg_resultant_x)
+
+    # Convert resultant vector to polar form (magnitude and angle)
+    HR_BL_unique_highest_inputs_filtered['HR-BL_weighted_vector_magnitude'] = np.sqrt(HR_BL_unique_highest_inputs_filtered['resultant_x']**2 + HR_BL_unique_highest_inputs_filtered['resultant_y']**2)
+    HR_BL_unique_highest_inputs_filtered['HR-BL_weighted_vector_angle'] = np.rad2deg(np.arctan2(HR_BL_unique_highest_inputs_filtered['resultant_y'], HR_BL_unique_highest_inputs_filtered['resultant_x']))
+
+    # Apply the function to each row to get end coordinates for weighted HR-BL vectors
+    # Function to compute the resultant end coordinates
+    def compute_end_coords(row):
+        start_x, start_y = row['HR-BL_start_coords']  # Unpacking the start coordinates
+        resultant_x = row['resultant_x']
+        resultant_y = row['resultant_y']
+        
+        # Compute the end coordinates
+        end_x = start_x + (resultant_x*2.5)
+        end_y = start_y + (resultant_y*2.5)
+        
+        return (end_x, end_y)
+        
+    HR_BL_unique_highest_inputs_filtered['HR-BL_resultant_end_coords'] = HR_BL_unique_highest_inputs_filtered.apply(compute_end_coords, axis=1)
+
+    return avg_resultant_radius, avg_resultant_angle
+
 #%% Plotting functions
 
 def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10):
@@ -242,7 +350,7 @@ def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=Non
     
     for i in range(len(x)):
         vertices = hexagon_vertices(x[i], y[i])
-        hexagon = Polygon(vertices, edgecolor='black', linewidth=1, facecolor='none')
+        hexagon = Polygon(vertices, edgecolor='lightgray', linewidth=0.25, facecolor='none')
         ax.add_patch(hexagon)
         hexagons.append(hexagon)
         
@@ -266,7 +374,7 @@ def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=Non
     return fig, ax, hexagons
 
 
-def draw_vector(ax, x_start, y_start, x_end, y_end, linewidth=1, head_size=0.25, **kwargs):
+def draw_vector(ax, x_start, y_start, x_end, y_end, linewidth=0.5, head_size=0.25, **kwargs):
     """
     Draws a vector (arrow) on the provided axes from a starting point to an ending point.
 
@@ -293,7 +401,7 @@ def draw_vector(ax, x_start, y_start, x_end, y_end, linewidth=1, head_size=0.25,
     --------
     None
     """
-    arrow_style = f'-|>,head_width={head_size},head_length={head_size * 1.5}'
+    arrow_style = f'-|>,head_width={head_size},head_length={head_size * 1}'
     ax.annotate('', xy=(x_end, y_end), xytext=(x_start, y_start),
                 arrowprops=dict(arrowstyle=arrow_style, linewidth=linewidth, fill=True, **kwargs))
 
@@ -392,14 +500,14 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
                     color_in_q = p_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
                         if x_pos == color_in_p and y_pos == color_in_q:
-                            hexagon.set_facecolor('g')
+                            hexagon.set_facecolor('lightgreen')
             elif i == 'q':
                 for q_x, q_y in q:
                     color_in_p = q_x
                     color_in_q = q_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
                         if x_pos == color_in_p and y_pos == color_in_q:
-                            hexagon.set_facecolor('c')
+                            hexagon.set_facecolor('lightblue')
             elif i == 'h':
                 # h = eye's equator
                 for h_x, h_y in h:
@@ -407,7 +515,7 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
                     color_in_q = h_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
                         if x_pos == color_in_p and y_pos == color_in_q:
-                            hexagon.set_facecolor('y')
+                            hexagon.set_facecolor('lightyellow')
             elif i == 'v':
                 # v = eye's meridian
                 for v_x, v_y in v:
@@ -415,7 +523,7 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
                     color_in_q = v_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
                         if x_pos == color_in_p and y_pos == color_in_q:
-                            hexagon.set_facecolor('grey')
+                            hexagon.set_facecolor('lightgray')
         _180_0_deg_axis = list(zip(h_x_ls,h_y_ls)) # This is my reference line to calculate vectors angles. (currently used. It is the eye´s equator)
         _270_90_deg_axis = list(zip(v_x_ls,v_y_ls)) # This is my reference line to calculate vectors angles. (currently NOT used. It is the perpendicular
 
@@ -425,52 +533,52 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
                 new_p_x_ls = []
                 for p_x, p_y in p:
                     color_in_p = p_x
-                    color_in_p = add_space_in_between(min_p_value, max_p_value, _space, [color_in_p])
+                    color_in_p = add_space_in_between(min_max_coordinates_dict,parameters_dict, [color_in_p])
                     color_in_p = color_in_p[0]
                     color_in_q = p_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(new_p_values, original_q)):
                         new_p_pos = calculate_new_p_values([color_in_p], [y_pos], start_key=min_q_value , end_key=max_q_value, relative_change=_relative_change)  - center_shift# dealing with shifts
                         if x_pos == new_p_pos[0] and y_pos == color_in_q:
-                            hexagon.set_facecolor('g')
+                            hexagon.set_facecolor('lightgreen')
                             new_p_x_ls.append(new_p_pos[0])
             
             elif i == 'q':            
                 new_q_x_ls = []
                 for q_x, q_y in q:
                     color_in_p = q_x
-                    color_in_p = add_space_in_between(min_p_value, max_p_value, _space, [color_in_p])
+                    color_in_p = add_space_in_between(min_max_coordinates_dict,parameters_dict, [color_in_p])
                     color_in_p = color_in_p[0]
                     color_in_q = q_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(new_p_values, original_q)):
                         new_p_pos = calculate_new_p_values([color_in_p], [y_pos], start_key=min_q_value , end_key=max_q_value, relative_change=_relative_change)  - center_shift# dealing with shifts
                         if x_pos == new_p_pos[0] and y_pos == color_in_q:
-                            hexagon.set_facecolor('c')
+                            hexagon.set_facecolor('lightblue')
                             new_q_x_ls.append(new_p_pos[0])
 
             elif i == 'h':                
                 new_h_x_ls = []
                 for h_x, h_y in h:
                     color_in_p = h_x
-                    color_in_p = add_space_in_between(min_p_value, max_p_value, _space, [color_in_p])
+                    color_in_p = add_space_in_between(min_max_coordinates_dict,parameters_dict, [color_in_p])
                     color_in_p = color_in_p[0]
                     color_in_q = h_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(new_p_values, original_q)):
                         new_p_pos = calculate_new_p_values([color_in_p], [y_pos], start_key=min_q_value , end_key=max_q_value, relative_change=_relative_change)  - center_shift# dealing with shifts
                         if x_pos == new_p_pos[0] and y_pos == color_in_q:
-                            hexagon.set_facecolor('y')
+                            hexagon.set_facecolor('lightyellow')
                             new_h_x_ls.append(new_p_pos[0])
             
             elif i == 'v':
                 new_v_x_ls = []
                 for v_x, v_y in v:
                     color_in_p = v_x
-                    color_in_p = add_space_in_between(min_p_value, max_p_value, _space, [color_in_p])
+                    color_in_p = add_space_in_between(min_max_coordinates_dict,parameters_dict, [color_in_p])
                     color_in_p = color_in_p[0]
                     color_in_q = v_y
                     for hexagon, (x_pos, y_pos) in zip(hexagons, zip(new_p_values, original_q)):
                         new_p_pos = calculate_new_p_values([color_in_p], [y_pos], start_key=min_q_value , end_key=max_q_value, relative_change=_relative_change) - center_shift # dealing with shifts
                         if x_pos == new_p_pos[0] and y_pos == color_in_q:
-                            hexagon.set_facecolor('grey')
+                            hexagon.set_facecolor('lightgray')
                     new_v_x_ls.append(new_p_pos[0])
 
         _180_0_deg_axis = list(zip(new_h_x_ls,h_y_ls)) # This is my reference line to calculate vectors angles. (currently used. It is the eye´s equator)
