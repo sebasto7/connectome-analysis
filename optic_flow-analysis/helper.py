@@ -103,6 +103,62 @@ def add_space_in_between(min_max_coordinates_dict,parameters_dict, key_list):
     
     return new_list
 
+def add_space_in_between_2(min_max_coordinates_dict, parameters_dict, key_list):
+    
+    """
+    Adds space between negative and positive values and returns a new list based on a provided key list.
+
+    Parameters:
+    -----------
+    min_max_coordinates_dict : dict
+        A dictionary containing the 'min_p_value' and 'max_p_value'.
+    parameters_dict : dict
+        A dictionary containing the 'space' value.
+    key_list : list
+        A list of keys to generate the corresponding spaced values.
+
+    Returns:
+    --------
+    new_list : list
+        A list of values generated based on the key list with added spacing.
+    """
+
+    # Unpacking values from dictionaries
+    num_negatives = min_max_coordinates_dict['min_p_value']
+    num_positives = min_max_coordinates_dict['max_p_value']
+    space = parameters_dict['space']
+
+    # Main functionality
+    # If num_negatives or num_positives are float, we'll need to generate the range manually
+    if isinstance(num_negatives, float) or isinstance(num_positives, float):
+        # Generating float-based ranges using linspace for negative and positive ranges
+        negative_numbers = np.linspace(-space * num_negatives, -space, int(num_negatives))
+        positive_numbers = np.linspace(space, space * num_positives, int(num_positives))
+    else:
+        # When both values are integers, we can use the original logic
+        num_negatives = num_negatives * -1  # Convert to negative for the range
+        negative_numbers = [-space * i for i in range(num_negatives, 0, -1)]
+        positive_numbers = [space * i for i in range(1, num_positives + 1)]
+    
+    # Combine both negative and positive numbers with a 0 in between
+    generated_list = list(negative_numbers) + [0] + list(positive_numbers)
+
+    # Create the original range, treating negative to positive values
+    original_range = list(range(-int(num_negatives), int(num_positives) + 1))
+
+    # Mapping the original range to the generated list
+    space_dict = {}
+    for i, key in enumerate(original_range):
+        if i < len(generated_list):
+            space_dict[key] = generated_list[i]
+        else:
+            space_dict[key] = None
+
+    # Build the final list based on the provided key list
+    new_list = [space_dict.get(key, None) for key in key_list]
+    
+    return new_list
+
 def getting_correlators_start_end_coordinates(corr_ls, df_grid, HR_BL_unique_highest_inputs_filtered, map_type):
     for corr_i in corr_ls:
         if corr_i == 'BL':
@@ -142,6 +198,19 @@ def getting_correlators_start_end_coordinates(corr_ls, df_grid, HR_BL_unique_hig
     
                 end_id_p = df_grid[df_grid.column_id == str(end_id)].p.values[0]
                 end_id_q = df_grid[df_grid.column_id == str(end_id)].q.values[0]
+                end_coords_ls.append((end_id_p, end_id_q))
+
+        elif map_type == 'regular-rotated':
+            # Getting vector coordinates    
+            start_coords_ls = []
+            end_coords_ls = []
+            for start_id, end_id in zip(start_ids, end_ids):
+                start_id_p = df_grid[df_grid.column_id == str(start_id)].rotated_p.values[0]
+                start_id_q = df_grid[df_grid.column_id == str(start_id)].rotated_q.values[0]
+                start_coords_ls.append((start_id_p, start_id_q))
+    
+                end_id_p = df_grid[df_grid.column_id == str(end_id)].rotated_p.values[0]
+                end_id_q = df_grid[df_grid.column_id == str(end_id)].rotated_q.values[0]
                 end_coords_ls.append((end_id_p, end_id_q))
             
 
@@ -300,6 +369,12 @@ def get_weighted_correlator(HR_BL_unique_highest_inputs_filtered):
 
     return avg_resultant_radius, avg_resultant_angle
 
+# Function to apply rotation to a point (x, y)
+def rotate_point(x, y, cos_theta, sin_theta):
+    x_new = x * cos_theta + y * sin_theta
+    y_new = -x * sin_theta + y * cos_theta
+    return (x_new, y_new)
+
 #%% Plotting functions
 
 def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10):
@@ -370,6 +445,16 @@ def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=Non
     ax.set_ylim(min(y) - hex_size - spacing, max(y) + hex_size + spacing)
     
     ax.autoscale_view()
+
+    # Remove the box (spines) around the plot
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    
+    ax.set_xticks([])  # Remove x-axis ticks
+    ax.set_yticks([])  # Remove y-axis ticks
+
     
     return fig, ax, hexagons
 
@@ -486,6 +571,12 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
     p_x_ls = reference_axes_dict['p_x_ls'] 
     q_x_ls = reference_axes_dict['q_x_ls']
     q_y_ls = reference_axes_dict['q_y_ls']
+    h_x_ls_rotated = reference_axes_dict['h_x_ls_rotated'] 
+    h_y_ls_rotated = reference_axes_dict['h_y_ls_rotated'] 
+    v_x_ls_rotated = reference_axes_dict['v_x_ls_rotated'] 
+    v_y_ls_rotated = reference_axes_dict['v_y_ls_rotated'] 
+
+    
 
     h = list(zip(h_x_ls,h_y_ls))
     v = list(zip(v_x_ls,v_y_ls))
@@ -525,7 +616,31 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
                         if x_pos == color_in_p and y_pos == color_in_q:
                             hexagon.set_facecolor('lightgray')
         _180_0_deg_axis = list(zip(h_x_ls,h_y_ls)) # This is my reference line to calculate vectors angles. (currently used. It is the eye´s equator)
-        _270_90_deg_axis = list(zip(v_x_ls,v_y_ls)) # This is my reference line to calculate vectors angles. (currently NOT used. It is the perpendicular
+        _270_90_deg_axis = list(zip(v_x_ls,v_y_ls)) # This is my reference line to calculate vectors angles. (currently NOT used. It is the meridian)
+
+    if map_type == 'regular-rotated':
+        for i in reference_axses_ls:
+            if i == 'p':
+                for hexagon, (x_pos, y_pos) in zip(hexagons, zip(df_grid['rotated_p'], df_grid['rotated_q'])):
+                    if x_pos == -y_pos:
+                        hexagon.set_facecolor('lightgreen')
+            elif i == 'q':
+                for hexagon, (x_pos, y_pos) in zip(hexagons, zip(df_grid['rotated_p'], df_grid['rotated_q'])):
+                    if x_pos == y_pos:
+                        hexagon.set_facecolor('lightblue')
+                                    
+            elif i == 'h': # h = eye's equator
+                for hexagon, (x_pos, y_pos) in zip(hexagons, zip(df_grid['rotated_p'], df_grid['rotated_q'])):
+                    if y_pos == 0:
+                        hexagon.set_facecolor('lightyellow')
+            elif i == 'v': # v = eye's meridian
+                for hexagon, (x_pos, y_pos) in zip(hexagons, zip(df_grid['rotated_p'], df_grid['rotated_q'])):
+                    if x_pos == 0:
+                        hexagon.set_facecolor('lightgray')
+                        
+        _180_0_deg_axis = list(zip(h_x_ls_rotated,h_y_ls_rotated)) # This is my reference line to calculate vectors angles. (currently used. It is the eye´s equator)
+        _270_90_deg_axis = list(zip(v_x_ls_rotated,v_y_ls_rotated)) # This is my reference line to calculate vectors angles. (currently NOT used. It is the meridian
+    
 
     elif map_type == 'hexagonal':
         for i in reference_axses_ls:
@@ -582,7 +697,7 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
                     new_v_x_ls.append(new_p_pos[0])
 
         _180_0_deg_axis = list(zip(new_h_x_ls,h_y_ls)) # This is my reference line to calculate vectors angles. (currently used. It is the eye´s equator)
-        _270_90_deg_axis = list(zip(new_v_x_ls,v_y_ls)) # This is my reference line to calculate vectors angles. (currently NOT used. It is the perpendicular
+        _270_90_deg_axis = list(zip(new_v_x_ls,v_y_ls)) # This is my reference line to calculate vectors angles. (currently NOT used. It is the meridina)
 
     return  _180_0_deg_axis, _270_90_deg_axis
 
