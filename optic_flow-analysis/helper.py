@@ -377,7 +377,7 @@ def rotate_point(x, y, cos_theta, sin_theta):
 
 #%% Plotting functions
 
-def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10):
+def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10, ax=None):
     """
     Plots a hexagonal grid using the provided x and y coordinates.
 
@@ -412,8 +412,12 @@ def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=Non
     hexagons : list of matplotlib.patches.Polygon
         List of hexagon patch objects used in the plot.
     """
-    fig, ax = plt.subplots(figsize=fig_size)
-    ax.set_aspect('equal')
+    fig = None  # Initialize fig as None to avoid unbound error
+    if ax is None:  # Create new fig and ax if not provided
+        fig, ax = plt.subplots(figsize=fig_size)
+        ax.set_aspect('equal')
+    #fig, ax = plt.subplots(figsize=fig_size)
+    #ax.set_aspect('equal')
     
     hexagons = []
     
@@ -504,6 +508,11 @@ def draw_correlator_vectors(correlator, HR_BL_unique_highest_inputs_filtered, ax
         x_end, y_end = end_coord
 
         draw_vector(ax, x_start, y_start, x_end, y_end, color=color_dict[to_cell_of_interest])
+        # Check if the start and end coordinates are the same
+        if start_coord == end_coord:
+            # Plot a single dot at the start_coord
+            ax.plot(x_start, y_start, 'o', color=color_dict[to_cell_of_interest],markersize=1)  # 'o' for dot marker
+            
 
 
 
