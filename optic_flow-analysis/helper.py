@@ -15,6 +15,36 @@ import pandas as pd
 import seaborn as sns
 from scipy.stats import gaussian_kde
 #%% Analsis functions
+
+def combine_xyz(df):
+    """
+    Combines separated x, y and z column into one, changes units and adds new column names for
+    generating a neuroglancer link with function nglui.statebuilder.helpers.make_synapse_neuroglancer_link
+
+    Args:
+        pandas data frame containing x,y and z as columns of the same length
+
+    Returns:
+        same pandas data frame containing a new column with [x/4,y/4,z/40] lists
+    """
+    # Generating the single column
+
+    post_pt_position = []
+    for x,y,z in zip(df['post_x'].tolist(),df['post_y'].tolist(),df['post_z'].tolist()):
+        temp_ls = [x/4,y/4,z/40]
+        post_pt_position.append(temp_ls)
+
+    pre_pt_position = []
+    for x,y,z in zip(df['pre_x'].tolist(),df['pre_y'].tolist(),df['pre_z'].tolist()):
+        temp_ls = [x/4,y/4,z/40]
+        pre_pt_position.append(temp_ls)
+
+    #Adding new columns and names
+    df['post_pt_position'] = post_pt_position
+    df['pre_pt_position'] = pre_pt_position
+    #Changing column names
+    df.rename(columns={'pre': 'pre_pt_root_id', 'post': 'post_pt_root_id'}, inplace=True)
+
 def calculate_new_p_values(original_x, original_y, start_key=-16, end_key=17, relative_change=0.5, in_space=0):
     """
     Calculates new x values by applying a relative change based on a mapping of y values.
