@@ -637,11 +637,8 @@ def project_to_2d_plane(df):
         nearest_neighbors_ids = row['nearest_neighbours']
         
         # Get the relevant rows for PCA: current row and its nearest neighbors
-        relevant_rows = df[df['column_id'].isin([current_column_id] + nearest_neighbors_ids)]
-        
-        # Separate the current row from its nearest neighbors to ensure it comes first
-        current_row = relevant_rows[relevant_rows['column_id'] == current_column_id]
-        neighbor_rows = relevant_rows[relevant_rows['column_id'] != current_column_id]
+        current_row = df[df['column_id'] == current_column_id]
+        neighbor_rows = df.set_index('column_id').loc[nearest_neighbors_ids].reset_index()
         
         # Reorder rows to have the current row first
         relevant_rows_ordered = pd.concat([current_row, neighbor_rows])
@@ -671,8 +668,170 @@ def project_to_2d_plane(df):
     return df
 
 
+import numpy as np
+
+def fit_reference_line_to_plane(df_grid_extended, _column_id):
+    """
+    Function to extract data and compute the best fit line for a given column_id.
+    
+    Parameters:
+    df_grid_extended (pd.DataFrame): DataFrame containing the grid data.
+    _column_id (str): The column ID for which the data is extracted.
+
+    Returns:
+    x_plane, y_plane (arrays): Coordinates of the projected points.
+    x_home, y_home (floats): Coordinates of the home dot.
+    x_fit, y_fit (arrays): Coordinates for the best fit line.
+    """
+    # Extract nearest neighbors and equator match IDs for a given column_id
+    chosen_row = df_grid_extended[df_grid_extended['column_id'] == _column_id]
+    local_plane_coords_row = chosen_row.local_plane_coords
+
+    if chosen_row.empty:
+        raise ValueError(f"Column ID '{_column_id}' not found.")
+    
+    nearest_neighbors = chosen_row['nearest_neighbours'].values[0]
+    equator_match_ids = chosen_row['equator_match_ids'].values[0]
+
+    # Convert equator_match_ids to a set for faster lookup
+    equator_match_ids_set = set(equator_match_ids)
+
+    # Find positions of nearest neighbors that are in equator_match_ids
+    positions = [i for i, neighbor in enumerate(nearest_neighbors) if neighbor in equator_match_ids_set]
+
+    reference_equator_coord_2D = []
+    for pos in positions:
+        temp_coord = local_plane_coords_row.values.tolist()[0][pos]
+        reference_equator_coord_2D.append(temp_coord)
+
+    # Add the position of the chosen column id
+    home_dot_coord = chosen_row.home_dot_coords.values.tolist()[0]
+    home_dot_coord_array = np.array(home_dot_coord)
+    reference_equator_coord_2D = np.vstack([reference_equator_coord_2D, home_dot_coord_array])
+
+    # Sample data from df_grid_extended for 'given' column_id 
+    local_plane_coords = np.array(df_grid_extended[df_grid_extended.column_id == _column_id].local_plane_coords.tolist()[0])
+    local_home_coords = np.array(df_grid_extended[df_grid_extended.column_id == _column_id].home_dot_coords.tolist()[0])
+    x_plane = local_plane_coords[:, 0]
+    y_plane = local_plane_coords[:, 1]
+    x_home = local_home_coords[0]
+    y_home = local_home_coords[1]
+
+    # Reference equator coordinates (example values or calculated previously)
+    reference_equator_coord_2D = np.array(reference_equator_coord_2D)
+
+    # Extract x and y coordinates for analysis
+    x_equator = reference_equator_coord_2D[:, 0]
+    y_equator = reference_equator_coord_2D[:, 1]
+
+    # Calculate the absolute range for both axes
+    x_range = np.max(np.abs(x_equator)) - np.min(np.abs(x_equator))
+    y_range = np.max(np.abs(y_equator)) - np.min(np.abs(y_equator))
+
+    # Determine which axis has the largest spread and fit a line accordingly
+    if y_range > x_range:
+        # Fit a line based on the y-axis (larger range)
+        slope, intercept = np.polyfit(y_equator, x_equator, 1)
+        y_fit = np.linspace(np.min(y_equator), np.max(y_equator), 100)
+        x_fit = slope * y_fit + intercept
+    else:
+        # Fit a line based on the x-axis (larger range)
+        slope, intercept = np.polyfit(x_equator, y_equator, 1)
+        x_fit = np.linspace(np.min(x_equator), np.max(x_equator), 100)
+        y_fit = slope * x_fit + intercept
+
+    return x_plane, y_plane, x_home, y_home, x_fit, y_fit
+
+
 
 #%% Plotting functions
+
+def plot_tetra_grid(x, y, tet_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10, ax=None):
+    """
+    Plots a tetragonal grid using the provided x and y coordinates.
+
+    Parameters:
+    -----------
+    x : list or array-like
+        List of x coordinates for the centers of the tetragons.
+    y : list or array-like
+        List of y coordinates for the centers of the tetragons.
+    tet_size : float, optional
+        The size of each tetragon, defined as the distance from the center to any vertex. Default is 1.0.
+    spacing : float, optional
+        The amount of space between tetragons. Default is 1.5.
+    fig_size : tuple, optional
+        Size of the figure (width, height) in inches. Default is (10, 10).
+    labels : list, optional
+        Labels to be displayed inside each tetragon. Must match the length of x and y.
+    label_type : str, optional
+        Type of labels to be displayed. Options are:
+        - 'manual_labels': Use the provided labels.
+        - 'xy': Display the coordinates (x, y) as labels.
+        Default is 'column_id'.
+    text_size : int, optional
+        Font size of the labels inside the tetragons. Default is 10.
+
+    Returns:
+    --------
+    fig : matplotlib.figure.Figure
+        The figure object containing the plot.
+    ax : matplotlib.axes._subplots.AxesSubplot
+        The axes object containing the plot.
+    tetragons : list of matplotlib.patches.Polygon
+        List of tetragon patch objects used in the plot.
+    """
+    fig = None  # Initialize fig as None to avoid unbound error
+    if ax is None:  # Create new fig and ax if not provided
+        fig, ax = plt.subplots(figsize=fig_size)
+        ax.set_aspect('equal')
+    
+    tetragons = []
+    
+    def tetragon_vertices(x_center, y_center):
+        """Calculate the vertices of a tetragon given its center coordinates."""
+        half_size = tet_size / 2
+        vertices = [
+            (x_center - half_size, y_center - half_size),  # Bottom left
+            (x_center + half_size, y_center - half_size),  # Bottom right
+            (x_center + half_size, y_center + half_size),  # Top right
+            (x_center - half_size, y_center + half_size)   # Top left
+        ]
+        return vertices
+    
+    for i in range(len(x)):
+        vertices = tetragon_vertices(x[i], y[i])
+        tetragon = Polygon(vertices, edgecolor='lightgray', linewidth=0.25, facecolor='none')
+        ax.add_patch(tetragon)
+        tetragons.append(tetragon)
+        
+        if label_type == 'manual_labels' and labels:
+            label = labels[i]
+        elif label_type == 'xy':
+            label = f'({x[i]}, {y[i]})'
+        else:
+            label = ''
+        
+        if label:
+            x_center = x[i]
+            y_center = y[i]
+            ax.text(x_center, y_center, label, ha='center', va='center', fontsize=text_size)
+    
+    ax.set_xlim(min(x) - tet_size - spacing, max(x) + tet_size + spacing)
+    ax.set_ylim(min(y) - tet_size - spacing, max(y) + tet_size + spacing)
+    
+    ax.autoscale_view()
+
+    # Remove the box (spines) around the plot
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    
+    ax.set_xticks([])  # Remove x-axis ticks
+    ax.set_yticks([])  # Remove y-axis ticks
+
+    return fig, ax, tetragons
 
 def plot_hex_grid(x, y, hex_size=1.0, spacing=1.5, fig_size=(10, 10), labels=None, label_type='column_id', text_size=10, ax=None):
     """
@@ -1008,7 +1167,7 @@ def color_hexagons_reference_axes(df_grid, hexagons,parameters_dict,min_max_coor
     return  _180_0_deg_axis, _270_90_deg_axis
 
 
-def color_hexagons_reference_equators(df_grid, hexagons, reference_axes_dict, map_type, x_start=-30, x_steps=50):
+def color_polygons_reference_equators(df_grid, polygons, reference_axes_dict, map_type, x_start=-30, x_steps=50):
     """
     Add Docstring once the function is complete
     """
@@ -1036,9 +1195,9 @@ def color_hexagons_reference_equators(df_grid, hexagons, reference_axes_dict, ma
             for h_x, h_y in h:
                 color_in_p = h_x
                 color_in_q = h_y
-                for hexagon, (x_pos, y_pos) in zip(hexagons, zip(original_p, original_q)):
+                for polygon, (x_pos, y_pos) in zip(polygons, zip(original_p, original_q)):
                     if x_pos == color_in_p and y_pos == color_in_q:
-                        hexagon.set_facecolor(color)  # Apply the color from the palette
+                        polygon.set_facecolor(color)  # Apply the color from the palette
 
 
 
@@ -1122,12 +1281,114 @@ def color_hexagons_reference_equators(df_grid, hexagons, reference_axes_dict, ma
 #     # Show the plot
 #     fig.show()
 
+# def plot_nearest_neighbors(df, chosen_column_id):
+#     import plotly.graph_objects as go
+    
+#     """
+#     Plot the centroid_x, centroid_y, centroid_z of the chosen row in red,
+#     the nearest neighbors in blue, equator match IDs in yellow, and all other points in black using Plotly.
+#     """
+#     # Find the row corresponding to the chosen column_id
+#     chosen_row = df[df['column_id'] == chosen_column_id]
+    
+#     if chosen_row.empty:
+#         print(f"Column ID {chosen_column_id} not found in the DataFrame.")
+#         return
+    
+#     # Extract the coordinates of the chosen row
+#     chosen_x = chosen_row['centroid_x'].values[0]
+#     chosen_y = chosen_row['centroid_y'].values[0]
+#     chosen_z = chosen_row['centroid_z'].values[0]
+    
+#     # Extract the nearest neighbors' column_ids
+#     nearest_neighbors_ids = chosen_row['nearest_neighbours'].values[0]
+    
+#     # Extract the coordinates of the nearest neighbors
+#     nearest_neighbors = df[df['column_id'].isin(nearest_neighbors_ids)]
+#     nearest_x = nearest_neighbors['centroid_x'].values
+#     nearest_y = nearest_neighbors['centroid_y'].values
+#     nearest_z = nearest_neighbors['centroid_z'].values
+    
+#     # Extract equator match IDs
+#     equator_match_ids = chosen_row['equator_match_ids'].values[0]
+    
+#     # Extract the coordinates of the equator match IDs
+#     equator_matches = df[df['column_id'].isin(equator_match_ids)]
+#     equator_x = equator_matches['centroid_x'].values
+#     equator_y = equator_matches['centroid_y'].values
+#     equator_z = equator_matches['centroid_z'].values
+    
+#     # Extract the coordinates of all other points
+#     all_other_neighbors = df[~df['column_id'].isin(nearest_neighbors_ids) & 
+#                              ~df['column_id'].isin(equator_match_ids) & 
+#                              (df['column_id'] != chosen_column_id)]
+#     other_x = all_other_neighbors['centroid_x'].values
+#     other_y = all_other_neighbors['centroid_y'].values
+#     other_z = all_other_neighbors['centroid_z'].values
+    
+#     # Create a 3D plot using Plotly
+#     fig = go.Figure()
+
+#     # Add the chosen row in red
+#     fig.add_trace(go.Scatter3d(
+#         x=[chosen_x],
+#         y=[chosen_y],
+#         z=[chosen_z],
+#         mode='markers',
+#         marker=dict(size=10, color='red'),
+#         name='Chosen Row'
+#     ))
+
+#     # Add the nearest neighbors in blue
+#     fig.add_trace(go.Scatter3d(
+#         x=nearest_x,
+#         y=nearest_y,
+#         z=nearest_z,
+#         mode='markers',
+#         marker=dict(size=5, color='blue'),
+#         name='Nearest Neighbors'
+#     ))
+
+#     # Add equator match IDs in yellow
+#     fig.add_trace(go.Scatter3d(
+#         x=equator_x,
+#         y=equator_y,
+#         z=equator_z,
+#         mode='markers',
+#         marker=dict(size=2, color='yellow'),
+#         name='Equator Match IDs'
+#     ))
+
+#     # Add all other points in black
+#     fig.add_trace(go.Scatter3d(
+#         x=other_x,
+#         y=other_y,
+#         z=other_z,
+#         mode='markers',
+#         marker=dict(size=4, color='black'),
+#         name='Other Points'
+#     ))
+
+#     # Set labels and title
+#     fig.update_layout(
+#         scene=dict(
+#             xaxis_title='Centroid X',
+#             yaxis_title='Centroid Y',
+#             zaxis_title='Centroid Z'
+#         ),
+#         title=f"3D Plot for Column ID {chosen_column_id} and its Nearest Neighbors"
+#     )
+
+#     # Show the plot
+#     fig.show()
+
 def plot_nearest_neighbors(df, chosen_column_id):
     import plotly.graph_objects as go
     
     """
     Plot the centroid_x, centroid_y, centroid_z of the chosen row in red,
     the nearest neighbors in blue, equator match IDs in yellow, and all other points in black using Plotly.
+    Display column_id when hovering over points.
     """
     # Find the row corresponding to the chosen column_id
     chosen_row = df[df['column_id'] == chosen_column_id]
@@ -1144,28 +1405,31 @@ def plot_nearest_neighbors(df, chosen_column_id):
     # Extract the nearest neighbors' column_ids
     nearest_neighbors_ids = chosen_row['nearest_neighbours'].values[0]
     
-    # Extract the coordinates of the nearest neighbors
+    # Extract the coordinates and column_ids of the nearest neighbors
     nearest_neighbors = df[df['column_id'].isin(nearest_neighbors_ids)]
     nearest_x = nearest_neighbors['centroid_x'].values
     nearest_y = nearest_neighbors['centroid_y'].values
     nearest_z = nearest_neighbors['centroid_z'].values
+    nearest_text = nearest_neighbors['column_id'].values  # Hover text for nearest neighbors
     
     # Extract equator match IDs
     equator_match_ids = chosen_row['equator_match_ids'].values[0]
     
-    # Extract the coordinates of the equator match IDs
+    # Extract the coordinates and column_ids of the equator match IDs
     equator_matches = df[df['column_id'].isin(equator_match_ids)]
     equator_x = equator_matches['centroid_x'].values
     equator_y = equator_matches['centroid_y'].values
     equator_z = equator_matches['centroid_z'].values
+    equator_text = equator_matches['column_id'].values  # Hover text for equator match points
     
-    # Extract the coordinates of all other points
+    # Extract the coordinates and column_ids of all other points
     all_other_neighbors = df[~df['column_id'].isin(nearest_neighbors_ids) & 
                              ~df['column_id'].isin(equator_match_ids) & 
                              (df['column_id'] != chosen_column_id)]
     other_x = all_other_neighbors['centroid_x'].values
     other_y = all_other_neighbors['centroid_y'].values
     other_z = all_other_neighbors['centroid_z'].values
+    other_text = all_other_neighbors['column_id'].values  # Hover text for other points
     
     # Create a 3D plot using Plotly
     fig = go.Figure()
@@ -1177,7 +1441,9 @@ def plot_nearest_neighbors(df, chosen_column_id):
         z=[chosen_z],
         mode='markers',
         marker=dict(size=10, color='red'),
-        name='Chosen Row'
+        name='Chosen Row',
+        text=[chosen_column_id],  # Hover text for the chosen row
+        hoverinfo='text'
     ))
 
     # Add the nearest neighbors in blue
@@ -1187,7 +1453,9 @@ def plot_nearest_neighbors(df, chosen_column_id):
         z=nearest_z,
         mode='markers',
         marker=dict(size=5, color='blue'),
-        name='Nearest Neighbors'
+        name='Nearest Neighbors',
+        text=nearest_text,  # Hover text for nearest neighbors
+        hoverinfo='text'
     ))
 
     # Add equator match IDs in yellow
@@ -1197,7 +1465,9 @@ def plot_nearest_neighbors(df, chosen_column_id):
         z=equator_z,
         mode='markers',
         marker=dict(size=2, color='yellow'),
-        name='Equator Match IDs'
+        name='Equator Match IDs',
+        text=equator_text,  # Hover text for equator match points
+        hoverinfo='text'
     ))
 
     # Add all other points in black
@@ -1207,7 +1477,9 @@ def plot_nearest_neighbors(df, chosen_column_id):
         z=other_z,
         mode='markers',
         marker=dict(size=4, color='black'),
-        name='Other Points'
+        name='Other Points',
+        text=other_text,  # Hover text for other points
+        hoverinfo='text'
     ))
 
     # Set labels and title
@@ -1222,6 +1494,7 @@ def plot_nearest_neighbors(df, chosen_column_id):
 
     # Show the plot
     fig.show()
+
 
 def plot_local_plane_coords(df, chosen_column_id):
     import plotly.graph_objects as go
