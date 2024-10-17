@@ -510,107 +510,6 @@ def find_nearest_neighbors(df, n_neighbors=24):
     return df
 
 
-# def project_to_2d_plane(df):
-#     from sklearn.decomposition import PCA
-#     """
-#     Project the centroid_x, centroid_y, centroid_z of each row and its nearest neighbors 
-#     onto a 2D plane defined by the first two principal components (PC1 and PC2) using PCA.
-    
-#     Parameters:
-#     - df: DataFrame containing the data with columns ['column_id', 'centroid_x', 'centroid_y', 'centroid_z', 'nearest_neighbours']
-    
-#     Returns:
-#     - DataFrame with a new column 'local_plane_coords' containing the projected coordinates as lists.
-#     """
-#     # Initialize the local_plane_coords column
-#     df['local_plane_coords'] = None
-#     df['home_dot_coords'] = None
-    
-#     # Iterate through each row in the DataFrame
-#     for index, row in df.iterrows():
-#         # Extract the current row's column_id and its nearest neighbors' ids
-#         current_column_id = row['column_id']
-#         nearest_neighbors_ids = row['nearest_neighbours']
-        
-#         # Get the relevant rows for PCA: current row and its nearest neighbors
-#         home_row = df[df['column_id'].isin([current_column_id])]
-#         relevant_rows = df[df['column_id'].isin([current_column_id] + nearest_neighbors_ids)]
-        
-#         # Check if we have enough rows for PCA
-#         if len(relevant_rows) < 2:
-#             print(f"Not enough rows to perform PCA for Column ID {current_column_id}.")
-#             continue
-        
-#         # Prepare data for PCA
-#         home_dot_coordinates = home_row[['centroid_x', 'centroid_y', 'centroid_z']].values
-#         coordinates = relevant_rows[['centroid_x', 'centroid_y', 'centroid_z']].values
-        
-#         # Apply PCA
-#         pca = PCA(n_components=2)
-#         projected_coords = pca.fit_transform(coordinates)
-        
-#         # Create a list of projected coordinates for the relevant rows
-#         projected_list = projected_coords
-        
-#         # Save the projected coordinates in the local_plane_coords column
-#         df.at[index, 'local_plane_coords'] = projected_list
-    
-#     return df
-
-
-# def project_to_2d_plane(df):
-#     from sklearn.decomposition import PCA
-#     """
-#     Project the centroid_x, centroid_y, centroid_z of each row and its nearest neighbors 
-#     onto a 2D plane defined by the first two principal components (PC1 and PC2) using PCA.
-    
-#     Parameters:
-#     - df: DataFrame containing the data with columns ['column_id', 'centroid_x', 'centroid_y', 'centroid_z', 'nearest_neighbours']
-    
-#     Returns:
-#     - DataFrame with new columns:
-#         - 'local_plane_coords': containing the projected coordinates of the row and its neighbors as lists.
-#         - 'home_dot_coords': containing the 2D projected coordinates of the current row.
-#     """
-#     # Initialize the new columns
-#     df['local_plane_coords'] = None
-#     df['home_dot_coords'] = None
-    
-#     # Iterate through each row in the DataFrame
-#     for index, row in df.iterrows():
-#         # Extract the current row's column_id and its nearest neighbors' ids
-#         current_column_id = row['column_id']
-#         nearest_neighbors_ids = row['nearest_neighbours']
-        
-#         # Get the relevant rows for PCA: current row and its nearest neighbors
-#         relevant_rows = df[df['column_id'].isin([current_column_id] + nearest_neighbors_ids)]
-#         if current_column_id == '5':
-#             display(relevant_rows)
-        
-#         # Check if we have enough rows for PCA
-#         if len(relevant_rows) < 2:
-#             print(f"Not enough rows to perform PCA for Column ID {current_column_id}.")
-#             continue
-        
-#         # Prepare data for PCA
-#         coordinates = relevant_rows[['centroid_x', 'centroid_y', 'centroid_z']].values
-        
-#         # Apply PCA
-#         pca = PCA(n_components=2)
-#         projected_coords = pca.fit_transform(coordinates)
-        
-#         # Save the projected coordinates of all points in 'local_plane_coords'
-#         df.at[index, 'local_plane_coords'] = projected_coords.tolist()
-        
-#         # Find the index of the current row in the projected data
-#         # Since the first row corresponds to the current row (home_dot), we select the first element
-#         home_dot_projected = projected_coords[0]  # First row is the home dot
-        
-#         # Save the home dot projected coordinates in 'home_dot_coords'
-#         df.at[index, 'home_dot_coords'] = home_dot_projected.tolist()
-    
-#     return df
-
 
 def project_to_2d_plane(df):
     from sklearn.decomposition import PCA
@@ -667,8 +566,105 @@ def project_to_2d_plane(df):
     
     return df
 
+# def project_vector_to_2d_plane(df):
+#     def project_vector(row):
+#         # Extract the relevant coordinates from the row
+#         local_plane_coords = np.array(row['local_plane_coords'])
+#         center_mi1 = np.array([row['center_mi1_x'], row['center_mi1_y'], row['center_mi1_z']])
+#         center_mi4 = np.array([row['center_mi4_x'], row['center_mi4_y'], row['center_mi4_z']])
+        
+#         # Create the start and end points for the vector in 2D
+#         start_2d = center_mi1[:2]  # Take x and y from center_mi1
+#         end_2d = center_mi4[:2]    # Take x and y from center_mi4
+        
+#         # Store the vector's start and end position as a list in the new column
+#         return [start_2d.tolist(), end_2d.tolist()]
+    
+#     # Apply the projection function to each row and create a new column
+#     df['vector_dots_coords'] = df.apply(project_vector, axis=1)
+    
+#     return df
 
-import numpy as np
+
+# def project_vector_to_defined_plane(df):
+#     """
+#     Projects 3D vector coordinates onto a defined 2D plane using the normal vector of the plane.
+
+#     This function takes a DataFrame containing 3D coordinates and a set of 2D coordinates that define 
+#     a plane. It computes the projection of the start and end points of each vector (defined by 
+#     `center_mi1` and `center_mi4`) onto the specified plane.
+
+#     Parameters:
+#     ----------
+#     df : pandas.DataFrame
+#         A DataFrame containing the following columns:
+#         - 'local_plane_coords': A list of points defining the plane (should contain at least three points).
+#         - 'center_mi1_x', 'center_mi1_y', 'center_mi1_z': The x, y, z coordinates for the start point of the vector.
+#         - 'center_mi4_x', 'center_mi4_y', 'center_mi4_z': The x, y, z coordinates for the end point of the vector.
+
+#     Returns:
+#     -------
+#     pandas.DataFrame
+#         The original DataFrame with an additional column named 'vector_dots_coords', which contains 
+#         the projected x and y coordinates of the start and end points of the vectors on the defined plane.
+#         Each entry in this column is a dictionary with keys 'start' and 'end' containing the 
+#         respective projected 2D coordinates.
+#     """
+    
+#     def project_to_plane(point, plane_point, normal):
+#         """Project a 3D point onto the defined plane."""
+#         # Vector from the plane point to the point to project
+#         point_to_plane = point - plane_point
+        
+#         # Calculate the dot product to find the projection length
+#         distance_to_plane = np.dot(point_to_plane, normal) / np.linalg.norm(normal)**2
+        
+#         # Project the point onto the plane
+#         projected_point = point - distance_to_plane * normal
+#         return projected_point
+
+#     def compute_plane_normal(points):
+#         """Compute the best-fit plane normal from a set of points using SVD."""
+#         # Center the points
+#         points = np.array(points)
+#         centroid = np.mean(points, axis=0)
+#         centered_points = points - centroid
+        
+#         # Perform Singular Value Decomposition
+#         _, _, vh = np.linalg.svd(centered_points)
+        
+#         # The normal vector is the last column of V (vh)
+#         normal = vh[-1]
+#         return normal, centroid
+
+#     def project_vector(row):
+#         # Extract coordinates
+#         local_plane_coords = np.array(row['local_plane_coords'])
+#         center_mi1 = np.array([row['center_mi1_x'], row['center_mi1_y'], row['center_mi1_z']])
+#         center_mi4 = np.array([row['center_mi4_x'], row['center_mi4_y'], row['center_mi4_z']])
+        
+#         # Compute the normal vector of the plane defined by all local plane coordinates
+#         normal, plane_point = compute_plane_normal(local_plane_coords)
+        
+#         # Ensure plane_point is a 3D point
+#         plane_point = np.array([plane_point[0], plane_point[1], 0])  # Assuming the plane is at z=0
+        
+#         # Project the start and end points onto the defined plane
+#         projected_start = project_to_plane(center_mi1, plane_point, normal)
+#         projected_end = project_to_plane(center_mi4, plane_point, normal)
+        
+#         # Return only the x and y coordinates
+#         return {
+#             'start': projected_start[:2].tolist(),  # x and y of projected start
+#             'end': projected_end[:2].tolist()       # x and y of projected end
+#         }
+    
+#     # Apply the projection function to each row and create a new column
+#     df['vector_dots_coords'] = df.apply(project_vector, axis=1)
+    
+#     return df
+
+
 
 def fit_reference_line_to_plane(df_grid_extended, _column_id):
     """
@@ -1200,188 +1196,6 @@ def color_polygons_reference_equators(df_grid, polygons, reference_axes_dict, ma
                         polygon.set_facecolor(color)  # Apply the color from the palette
 
 
-
-    
-# def plot_nearest_neighbors(df, chosen_column_id):
-#     import plotly.graph_objects as go
-#     """
-#     Plot the centroid_x, centroid_y, centroid_z of the chosen row in red,
-#     the nearest neighbors in blue, and all other points in black using Plotly.
-#     """
-#     # Find the row corresponding to the chosen column_id
-#     chosen_row = df[df['column_id'] == chosen_column_id]
-    
-#     if chosen_row.empty:
-#         print(f"Column ID {chosen_column_id} not found in the DataFrame.")
-#         return
-    
-#     # Extract the coordinates of the chosen row
-#     chosen_x = chosen_row['centroid_x'].values[0]
-#     chosen_y = chosen_row['centroid_y'].values[0]
-#     chosen_z = chosen_row['centroid_z'].values[0]
-    
-#     # Extract the nearest neighbors' column_ids
-#     nearest_neighbors_ids = chosen_row['nearest_neighbours'].values[0]
-    
-#     # Extract the coordinates of the nearest neighbors
-#     nearest_neighbors = df[df['column_id'].isin(nearest_neighbors_ids)]
-#     nearest_x = nearest_neighbors['centroid_x'].values
-#     nearest_y = nearest_neighbors['centroid_y'].values
-#     nearest_z = nearest_neighbors['centroid_z'].values
-    
-#     # Extract the coordinates of all other points
-#     all_other_neighbors = df[~df['column_id'].isin(nearest_neighbors_ids) & (df['column_id'] != chosen_column_id)]
-#     other_x = all_other_neighbors['centroid_x'].values
-#     other_y = all_other_neighbors['centroid_y'].values
-#     other_z = all_other_neighbors['centroid_z'].values
-    
-#     # Create a 3D plot using Plotly
-#     fig = go.Figure()
-
-#     # Add the chosen row in red
-#     fig.add_trace(go.Scatter3d(
-#         x=[chosen_x],
-#         y=[chosen_y],
-#         z=[chosen_z],
-#         mode='markers',
-#         marker=dict(size=10, color='red'),
-#         name='Chosen Row'
-#     ))
-
-#     # Add the nearest neighbors in blue
-#     fig.add_trace(go.Scatter3d(
-#         x=nearest_x,
-#         y=nearest_y,
-#         z=nearest_z,
-#         mode='markers',
-#         marker=dict(size=5, color='blue'),
-#         name='Nearest Neighbors'
-#     ))
-
-#     # Add all other points in black
-#     fig.add_trace(go.Scatter3d(
-#         x=other_x,
-#         y=other_y,
-#         z=other_z,
-#         mode='markers',
-#         marker=dict(size=4, color='black'),
-#         name='Other Points'
-#     ))
-
-#     # Set labels and title
-#     fig.update_layout(
-#         scene=dict(
-#             xaxis_title='Centroid X',
-#             yaxis_title='Centroid Y',
-#             zaxis_title='Centroid Z'
-#         ),
-#         title=f"3D Plot for Column ID {chosen_column_id} and its Nearest Neighbors"
-#     )
-
-#     # Show the plot
-#     fig.show()
-
-# def plot_nearest_neighbors(df, chosen_column_id):
-#     import plotly.graph_objects as go
-    
-#     """
-#     Plot the centroid_x, centroid_y, centroid_z of the chosen row in red,
-#     the nearest neighbors in blue, equator match IDs in yellow, and all other points in black using Plotly.
-#     """
-#     # Find the row corresponding to the chosen column_id
-#     chosen_row = df[df['column_id'] == chosen_column_id]
-    
-#     if chosen_row.empty:
-#         print(f"Column ID {chosen_column_id} not found in the DataFrame.")
-#         return
-    
-#     # Extract the coordinates of the chosen row
-#     chosen_x = chosen_row['centroid_x'].values[0]
-#     chosen_y = chosen_row['centroid_y'].values[0]
-#     chosen_z = chosen_row['centroid_z'].values[0]
-    
-#     # Extract the nearest neighbors' column_ids
-#     nearest_neighbors_ids = chosen_row['nearest_neighbours'].values[0]
-    
-#     # Extract the coordinates of the nearest neighbors
-#     nearest_neighbors = df[df['column_id'].isin(nearest_neighbors_ids)]
-#     nearest_x = nearest_neighbors['centroid_x'].values
-#     nearest_y = nearest_neighbors['centroid_y'].values
-#     nearest_z = nearest_neighbors['centroid_z'].values
-    
-#     # Extract equator match IDs
-#     equator_match_ids = chosen_row['equator_match_ids'].values[0]
-    
-#     # Extract the coordinates of the equator match IDs
-#     equator_matches = df[df['column_id'].isin(equator_match_ids)]
-#     equator_x = equator_matches['centroid_x'].values
-#     equator_y = equator_matches['centroid_y'].values
-#     equator_z = equator_matches['centroid_z'].values
-    
-#     # Extract the coordinates of all other points
-#     all_other_neighbors = df[~df['column_id'].isin(nearest_neighbors_ids) & 
-#                              ~df['column_id'].isin(equator_match_ids) & 
-#                              (df['column_id'] != chosen_column_id)]
-#     other_x = all_other_neighbors['centroid_x'].values
-#     other_y = all_other_neighbors['centroid_y'].values
-#     other_z = all_other_neighbors['centroid_z'].values
-    
-#     # Create a 3D plot using Plotly
-#     fig = go.Figure()
-
-#     # Add the chosen row in red
-#     fig.add_trace(go.Scatter3d(
-#         x=[chosen_x],
-#         y=[chosen_y],
-#         z=[chosen_z],
-#         mode='markers',
-#         marker=dict(size=10, color='red'),
-#         name='Chosen Row'
-#     ))
-
-#     # Add the nearest neighbors in blue
-#     fig.add_trace(go.Scatter3d(
-#         x=nearest_x,
-#         y=nearest_y,
-#         z=nearest_z,
-#         mode='markers',
-#         marker=dict(size=5, color='blue'),
-#         name='Nearest Neighbors'
-#     ))
-
-#     # Add equator match IDs in yellow
-#     fig.add_trace(go.Scatter3d(
-#         x=equator_x,
-#         y=equator_y,
-#         z=equator_z,
-#         mode='markers',
-#         marker=dict(size=2, color='yellow'),
-#         name='Equator Match IDs'
-#     ))
-
-#     # Add all other points in black
-#     fig.add_trace(go.Scatter3d(
-#         x=other_x,
-#         y=other_y,
-#         z=other_z,
-#         mode='markers',
-#         marker=dict(size=4, color='black'),
-#         name='Other Points'
-#     ))
-
-#     # Set labels and title
-#     fig.update_layout(
-#         scene=dict(
-#             xaxis_title='Centroid X',
-#             yaxis_title='Centroid Y',
-#             zaxis_title='Centroid Z'
-#         ),
-#         title=f"3D Plot for Column ID {chosen_column_id} and its Nearest Neighbors"
-#     )
-
-#     # Show the plot
-#     fig.show()
-
 def plot_nearest_neighbors(df, chosen_column_id):
     import plotly.graph_objects as go
     
@@ -1452,7 +1266,7 @@ def plot_nearest_neighbors(df, chosen_column_id):
         y=nearest_y,
         z=nearest_z,
         mode='markers',
-        marker=dict(size=5, color='blue'),
+        marker=dict(size=8, color='blue'),
         name='Nearest Neighbors',
         text=nearest_text,  # Hover text for nearest neighbors
         hoverinfo='text'
@@ -1464,7 +1278,7 @@ def plot_nearest_neighbors(df, chosen_column_id):
         y=equator_y,
         z=equator_z,
         mode='markers',
-        marker=dict(size=2, color='yellow'),
+        marker=dict(size=6, color='yellow'),
         name='Equator Match IDs',
         text=equator_text,  # Hover text for equator match points
         hoverinfo='text'
@@ -1492,8 +1306,163 @@ def plot_nearest_neighbors(df, chosen_column_id):
         title=f"3D Plot for Column ID {chosen_column_id} and its Nearest Neighbors"
     )
 
+    # Set axis off
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            zaxis=dict(visible=False)
+        )
+    )
+
     # Show the plot
     fig.show()
+    return fig
+
+def plot_nearest_neighbors_and_vector(df, chosen_column_id):
+    import plotly.graph_objects as go
+    
+    """
+    Plot the centroid_x, centroid_y, centroid_z of the chosen row in red,
+    the nearest neighbors in blue, equator match IDs in yellow, two green points (vector start end end position), and all other points in black using Plotly.
+    Display column_id when hovering over points.
+    """
+    # Find the row corresponding to the chosen column_id
+    chosen_row = df[df['column_id'] == chosen_column_id]
+    
+    if chosen_row.empty:
+        print(f"Column ID {chosen_column_id} not found in the DataFrame.")
+        return
+    
+    # Extract the coordinates of the chosen row
+    chosen_x = chosen_row['centroid_x'].values[0]
+    chosen_y = chosen_row['centroid_y'].values[0]
+    chosen_z = chosen_row['centroid_z'].values[0]
+    
+    # Extract the nearest neighbors' column_ids
+    nearest_neighbors_ids = chosen_row['nearest_neighbours'].values[0]
+    
+    # Extract the coordinates and column_ids of the nearest neighbors
+    nearest_neighbors = df[df['column_id'].isin(nearest_neighbors_ids)]
+    nearest_x = nearest_neighbors['centroid_x'].values
+    nearest_y = nearest_neighbors['centroid_y'].values
+    nearest_z = nearest_neighbors['centroid_z'].values
+    nearest_text = nearest_neighbors['column_id'].values  # Hover text for nearest neighbors
+    
+    # Extract equator match IDs
+    equator_match_ids = chosen_row['equator_match_ids'].values[0]
+    
+    # Extract the coordinates and column_ids of the equator match IDs
+    equator_matches = df[df['column_id'].isin(equator_match_ids)]
+    equator_x = equator_matches['centroid_x'].values
+    equator_y = equator_matches['centroid_y'].values
+    equator_z = equator_matches['centroid_z'].values
+    equator_text = equator_matches['column_id'].values  # Hover text for equator match points
+    
+    # Extract the coordinates and column_ids of all other points
+    all_other_neighbors = df[~df['column_id'].isin(nearest_neighbors_ids) & 
+                             ~df['column_id'].isin(equator_match_ids) & 
+                             (df['column_id'] != chosen_column_id)]
+    other_x = all_other_neighbors['centroid_x'].values
+    other_y = all_other_neighbors['centroid_y'].values
+    other_z = all_other_neighbors['centroid_z'].values
+    other_text = all_other_neighbors['column_id'].values  # Hover text for other points
+    
+    # Extract coordinates for the two additional points
+    mi1_x = chosen_row['center_mi1_x'].values[0]
+    mi1_y = chosen_row['center_mi1_y'].values[0]
+    mi1_z = chosen_row['center_mi1_z'].values[0]
+    
+    mi4_x = chosen_row['center_mi4_x'].values[0]
+    mi4_y = chosen_row['center_mi4_y'].values[0]
+    mi4_z = chosen_row['center_mi4_z'].values[0]
+    
+    # Create a 3D plot using Plotly
+    fig = go.Figure()
+
+    # Add the chosen row in red
+    fig.add_trace(go.Scatter3d(
+        x=[chosen_x],
+        y=[chosen_y],
+        z=[chosen_z],
+        mode='markers',
+        marker=dict(size=10, color='red'),
+        name='Chosen Row',
+        text=[chosen_column_id],  # Hover text for the chosen row
+        hoverinfo='text'
+    ))
+
+    # Add the nearest neighbors in blue
+    fig.add_trace(go.Scatter3d(
+        x=nearest_x,
+        y=nearest_y,
+        z=nearest_z,
+        mode='markers',
+        marker=dict(size=8, color='blue'),
+        name='Nearest Neighbors',
+        text=nearest_text,  # Hover text for nearest neighbors
+        hoverinfo='text'
+    ))
+
+    # Add equator match IDs in yellow
+    fig.add_trace(go.Scatter3d(
+        x=equator_x,
+        y=equator_y,
+        z=equator_z,
+        mode='markers',
+        marker=dict(size=6, color='yellow'),
+        name='Equator Match IDs',
+        text=equator_text,  # Hover text for equator match points
+        hoverinfo='text'
+    ))
+
+    # Add all other points in black
+    fig.add_trace(go.Scatter3d(
+        x=other_x,
+        y=other_y,
+        z=other_z,
+        mode='markers',
+        marker=dict(size=4, color='black'),
+        name='Other Points',
+        text=other_text,  # Hover text for other points
+        hoverinfo='text'
+    ))
+    
+    # Add the two green points (center_mi1 and center_mi4)
+    fig.add_trace(go.Scatter3d(
+        x=[mi1_x, mi4_x],
+        y=[mi1_y, mi4_y],
+        z=[mi1_z, mi4_z],
+        mode='markers',
+        marker=dict(size=8, color='green'),
+        name='Vector Points',
+        text=['MI1', 'MI4'],  # Hover text for the green points
+        hoverinfo='text'
+    ))
+
+    # Set labels and title
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='Centroid X',
+            yaxis_title='Centroid Y',
+            zaxis_title='Centroid Z'
+        ),
+        title=f"3D Plot for Column ID {chosen_column_id} and its Nearest Neighbors"
+    )
+
+    # Set axis off
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False),
+            zaxis=dict(visible=False)
+        )
+    )
+
+    # Show the plot
+    fig.show()
+    return fig
+
 
 
 def plot_local_plane_coords(df, chosen_column_id):
