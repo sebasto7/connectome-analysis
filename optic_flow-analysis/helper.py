@@ -738,6 +738,76 @@ def fit_reference_line_to_plane(df_grid_extended, _column_id):
 
     return x_plane, y_plane, x_home, y_home, x_fit, y_fit
 
+def calculate_bl_angles(df, columns_id_data):
+    angles = []
+    # Iterate over each row in the dataframe
+    for idx, row in df.iterrows():
+        # IDs for Mi4 and Mi1
+        temp_Mi4_cell_ID = row['Mi4_ID']
+        temp_Mi1_cell_ID = row['Mi1_ID']
+
+        # Get column IDs using the 'columns_id_data' DataFrame
+        temp_Mi4_column_ID = columns_id_data[columns_id_data['root_id'] == temp_Mi4_cell_ID]['column_id'].tolist()[0]
+        temp_Mi1_column_ID = columns_id_data[columns_id_data['root_id'] == temp_Mi1_cell_ID]['column_id'].tolist()[0]
+
+        # Vector Start and End coordinates (Home Dot and Mi4 Nearest Neighbor)
+        temp_neighbors_ls = row['nearest_neighbours']
+        try:
+            temp_index = temp_neighbors_ls.index(temp_Mi4_column_ID)
+            temp_end_coords = row['local_plane_coords'][temp_index]
+            temp_start_coords = row['home_dot_coords']
+        except:
+            # Vectors with no length should not be considered.
+            temp_end_coords = row['home_dot_coords']
+            temp_start_coords = row['home_dot_coords']
+            angles.append(None)
+            continue  # Skip to the next row
+
+        # Fit the reference line and get coordinates for the plane (best fit line)
+        x_plane, y_plane, x_home, y_home, x_fit, y_fit = fit_reference_line_to_plane(df, row['column_id'])
+
+        # Given points defining the new line
+        x1 = x_fit[0]
+        y1 = y_fit[0]
+        x2 = x_fit[-1]
+        y2 = y_fit[-1]
+        
+        # Calculate the slope (m) and angle of the new line
+        slope = (y2 - y1) / (x2 - x1)
+        reference_angle_rad = np.arctan(slope)
+    
+            
+        # Calculate the vector angle
+        x_start = temp_start_coords[0]
+        y_start = temp_start_coords[1]
+        x_end = temp_end_coords[0]
+        y_end = temp_end_coords[1]
+        
+        # Calculate the change in coordinates
+        dx = x_end - x_start
+        dy = y_end - y_start
+        
+        # Calculate the angle in radians relative to the x-axis
+        angle_rad = np.arctan2(dy, dx)
+        
+        # Adjust the angle relative to the new reference line
+        adjusted_angle_rad = angle_rad - reference_angle_rad
+        
+        # Convert to degrees
+        adjusted_angle_deg = np.degrees(adjusted_angle_rad)
+        
+        # Normalize the angle to be in the range [0, 360) degrees
+        adjusted_angle_deg = (adjusted_angle_deg + 360) % 360
+        adjusted_angle_deg = round(adjusted_angle_deg)  # rounding angle's values
+        
+        # Append the result to the angles list
+        angles.append(adjusted_angle_deg)
+    
+    
+    # Updating the main data frame with angles
+    df[f'BL_angle'] = angles
+
+    return df # Returning the modified DataFrame
 
 
 #%% Plotting functions
@@ -1376,6 +1446,11 @@ def plot_nearest_neighbors_and_vector(df, chosen_column_id):
     mi4_x = chosen_row['center_mi4_x'].values[0]
     mi4_y = chosen_row['center_mi4_y'].values[0]
     mi4_z = chosen_row['center_mi4_z'].values[0]
+
+    # Get root_ids
+    mi1_root_id = chosen_row['Mi1_ID'].values[0]
+    mi4_root_id = chosen_row['Mi4_ID'].values[0]
+    
     
     # Create a 3D plot using Plotly
     fig = go.Figure()
@@ -1436,7 +1511,7 @@ def plot_nearest_neighbors_and_vector(df, chosen_column_id):
         mode='markers',
         marker=dict(size=8, color='green'),
         name='Vector Points',
-        text=['MI1', 'MI4'],  # Hover text for the green points
+        text=[f'Mi1: {mi1_root_id}', f'Mi4: {mi4_root_id}'],  # Hover text for the green points
         hoverinfo='text'
     ))
 
