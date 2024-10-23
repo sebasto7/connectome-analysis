@@ -666,6 +666,96 @@ def project_to_2d_plane(df):
 
 
 
+# def fit_reference_line_to_plane(df_grid_extended, _column_id):
+#     """
+#     Function to extract data and compute the best fit line for a given column_id.
+    
+#     Parameters:
+#     df_grid_extended (pd.DataFrame): DataFrame containing the grid data.
+#     _column_id (str): The column ID for which the data is extracted.
+
+#     Returns:
+#     x_plane, y_plane (arrays): Coordinates of the projected points.
+#     x_home, y_home (floats): Coordinates of the home dot.
+#     x_fit, y_fit (arrays): Coordinates for the best fit line.
+#     """
+#     # Extract nearest neighbors and equator match IDs for a given column_id
+#     chosen_row = df_grid_extended[df_grid_extended['column_id'] == _column_id]
+#     local_plane_coords_row = chosen_row.local_plane_coords
+
+#     if chosen_row.empty:
+#         raise ValueError(f"Column ID '{_column_id}' not found.")
+    
+#     nearest_neighbors = chosen_row['nearest_neighbours'].values[0]
+#     equator_match_ids = chosen_row['equator_match_ids'].values[0]
+
+#     # Convert equator_match_ids to a set for faster lookup
+#     equator_match_ids_set = set(equator_match_ids)
+
+#     # Find positions of nearest neighbors that are in equator_match_ids
+#     positions = [i for i, neighbor in enumerate(nearest_neighbors) if neighbor in equator_match_ids_set]
+
+#     reference_equator_coord_2D = [] # list off equator coordinated in the local plane
+#     local_equator_id_ls = [] # List of equator ids in the local plane
+#     for pos in positions:
+#         local_equator_id_ls.append(nearest_neighbors[pos])
+#         temp_coord = local_plane_coords_row.values.tolist()[0][pos]
+#         reference_equator_coord_2D.append(temp_coord)
+#     #Add the position of the chosen column id
+#     home_dot_coord = chosen_row.home_dot_coords.values.tolist()[0]
+#     home_dot_coord_array = np.array(home_dot_coord)
+#     reference_equator_coord_2D = np.vstack([reference_equator_coord_2D, home_dot_coord_array])
+#     local_equator_id_ls.append(_column_id)
+    
+    
+#     # Figuring out which equator column ID is most to the right (for later assign a right direction to the equator line in the local 2D plane
+#     current_higher_value = -100 # An arbitrary negative number
+#     for column_id in local_equator_id_ls:
+#         current_row = df_grid_extended[df_grid_extended.column_id == column_id]
+#         current_p = current_row.p.values[0]
+#         if current_p > current_higher_value:
+#             current_higher_value = current_p
+#             right_column_id = column_id
+    
+#     # Getting the local plane coordinate the "right_column_id"
+#     idx = temp_local_equator_id_ls.index(right_column_id)
+#     rigth_column_local_plane_coord = reference_equator_coord_2D[idx]
+ 
+
+#     # Sample data from df_grid_extended for 'given' column_id 
+#     local_plane_coords = np.array(df_grid_extended[df_grid_extended.column_id == _column_id].local_plane_coords.tolist()[0])
+#     local_home_coords = np.array(df_grid_extended[df_grid_extended.column_id == _column_id].home_dot_coords.tolist()[0])
+#     x_plane = local_plane_coords[:, 0]
+#     y_plane = local_plane_coords[:, 1]
+#     x_home = local_home_coords[0]
+#     y_home = local_home_coords[1]
+
+#     # Reference equator coordinates (example values or calculated previously)
+#     reference_equator_coord_2D = np.array(reference_equator_coord_2D)
+
+#     # Extract x and y coordinates for analysis
+#     x_equator = reference_equator_coord_2D[:, 0]
+#     y_equator = reference_equator_coord_2D[:, 1]
+
+#     # Calculate the absolute range for both axes
+#     x_range = np.max(np.abs(x_equator)) - np.min(np.abs(x_equator))
+#     y_range = np.max(np.abs(y_equator)) - np.min(np.abs(y_equator))
+
+#     # Determine which axis has the largest spread and fit a line accordingly
+#     if y_range > x_range:
+#         # Fit a line based on the y-axis (larger range)
+#         slope, intercept = np.polyfit(y_equator, x_equator, 1)
+#         y_fit = np.linspace(np.min(y_equator), np.max(y_equator), 100)
+#         x_fit = slope * y_fit + intercept
+#     else:
+#         # Fit a line based on the x-axis (larger range)
+#         slope, intercept = np.polyfit(x_equator, y_equator, 1)
+#         x_fit = np.linspace(np.min(x_equator), np.max(x_equator), 100)
+#         y_fit = slope * x_fit + intercept
+
+#     return x_plane, y_plane, x_home, y_home, x_fit, y_fit
+
+
 def fit_reference_line_to_plane(df_grid_extended, _column_id):
     """
     Function to extract data and compute the best fit line for a given column_id.
@@ -678,6 +768,7 @@ def fit_reference_line_to_plane(df_grid_extended, _column_id):
     x_plane, y_plane (arrays): Coordinates of the projected points.
     x_home, y_home (floats): Coordinates of the home dot.
     x_fit, y_fit (arrays): Coordinates for the best fit line.
+    equator_vector (tuple): Vector pointing in the "right" direction.
     """
     # Extract nearest neighbors and equator match IDs for a given column_id
     chosen_row = df_grid_extended[df_grid_extended['column_id'] == _column_id]
@@ -695,15 +786,39 @@ def fit_reference_line_to_plane(df_grid_extended, _column_id):
     # Find positions of nearest neighbors that are in equator_match_ids
     positions = [i for i, neighbor in enumerate(nearest_neighbors) if neighbor in equator_match_ids_set]
 
-    reference_equator_coord_2D = []
+    reference_equator_coord_2D = [] # list off equator coordinated in the local plane
+    local_equator_id_ls = [] # List of equator ids in the local plane
     for pos in positions:
+        local_equator_id_ls.append(nearest_neighbors[pos])
         temp_coord = local_plane_coords_row.values.tolist()[0][pos]
         reference_equator_coord_2D.append(temp_coord)
-
     # Add the position of the chosen column id
     home_dot_coord = chosen_row.home_dot_coords.values.tolist()[0]
     home_dot_coord_array = np.array(home_dot_coord)
     reference_equator_coord_2D = np.vstack([reference_equator_coord_2D, home_dot_coord_array])
+    local_equator_id_ls.append(_column_id)
+    
+    # Figuring out which equator column ID is most to the right (for later assign a right direction to the equator line in the local 2D plane
+    current_higher_value = -100 # An arbitrary negative number
+    for column_id in local_equator_id_ls:
+        current_row = df_grid_extended[df_grid_extended.column_id == column_id]
+
+        # Temporal debugging
+        try:
+            current_p = current_row.p.values[0]
+            if current_p > current_higher_value:
+                current_higher_value = current_p
+                right_column_id = column_id
+        except:
+            pass
+            #print(f'Column ID: {column_id}')
+            #print(current_row)
+            #print(local_equator_id_ls)
+        
+    
+    # Getting the local plane coordinate the "right_column_id"
+    idx = local_equator_id_ls.index(right_column_id)
+    rigth_column_local_plane_coord = reference_equator_coord_2D[idx]
 
     # Sample data from df_grid_extended for 'given' column_id 
     local_plane_coords = np.array(df_grid_extended[df_grid_extended.column_id == _column_id].local_plane_coords.tolist()[0])
@@ -736,9 +851,27 @@ def fit_reference_line_to_plane(df_grid_extended, _column_id):
         x_fit = np.linspace(np.min(x_equator), np.max(x_equator), 100)
         y_fit = slope * x_fit + intercept
 
-    return x_plane, y_plane, x_home, y_home, x_fit, y_fit
+    # Calculate distances from rigth_column_local_plane_coord to both extremes of the line
+    dist_to_start = np.sqrt((rigth_column_local_plane_coord[0] - x_fit[0])**2 + 
+                            (rigth_column_local_plane_coord[1] - y_fit[0])**2)
+    dist_to_end = np.sqrt((rigth_column_local_plane_coord[0] - x_fit[-1])**2 + 
+                          (rigth_column_local_plane_coord[1] - y_fit[-1])**2)
 
-def calculate_bl_angles(df, columns_id_data):
+    # Determine the direction of the vector based on proximity
+    if dist_to_end < dist_to_start:
+        equator_vector = (x_fit[-1] - x_fit[0], y_fit[-1] - y_fit[0])
+        vector_start_coords = [x_fit[0],y_fit[0]]
+        vector_end_coords = [x_fit[-1],y_fit[-1]]
+        
+    else:
+        equator_vector = (x_fit[0] - x_fit[-1], y_fit[0] - y_fit[-1])
+        vector_start_coords = [x_fit[-1],y_fit[-1]]
+        vector_end_coords = [x_fit[0],y_fit[0]]
+
+    return x_plane, y_plane, x_home, y_home, x_fit, y_fit, equator_vector, vector_start_coords, vector_end_coords
+
+
+def calculate_bl_angles_to_reference_line(df, columns_id_data):
     angles = []
     # Iterate over each row in the dataframe
     for idx, row in df.iterrows():
@@ -764,7 +897,7 @@ def calculate_bl_angles(df, columns_id_data):
             continue  # Skip to the next row
 
         # Fit the reference line and get coordinates for the plane (best fit line)
-        x_plane, y_plane, x_home, y_home, x_fit, y_fit = fit_reference_line_to_plane(df, row['column_id'])
+        x_plane, y_plane, x_home, y_home, x_fit, y_fit, equator_vector, vector_start_coords, vector_end_coords = fit_reference_line_to_plane(df, row['column_id'])
 
         # Given points defining the new line
         x1 = x_fit[0]
@@ -808,6 +941,165 @@ def calculate_bl_angles(df, columns_id_data):
     df[f'BL_angle'] = angles
 
     return df # Returning the modified DataFrame
+
+
+
+# def calculate_bl_angles_to_equator_vector(df, columns_id_data):
+#     angles = []
+    
+#     # Iterate over each row in the dataframe
+#     for idx, row in df.iterrows():
+#         # IDs for Mi4 and Mi1
+#         temp_Mi4_cell_ID = row['Mi4_ID']
+#         temp_Mi1_cell_ID = row['Mi1_ID']
+
+#         # Get column IDs using the 'columns_id_data' DataFrame
+#         temp_Mi4_column_ID = columns_id_data[columns_id_data['root_id'] == temp_Mi4_cell_ID]['column_id'].tolist()[0]
+#         temp_Mi1_column_ID = columns_id_data[columns_id_data['root_id'] == temp_Mi1_cell_ID]['column_id'].tolist()[0]
+
+#         # Vector Start and End coordinates (Home Dot and Mi4 Nearest Neighbor)
+#         temp_neighbors_ls = row['nearest_neighbours']
+#         try:
+#             temp_index = temp_neighbors_ls.index(temp_Mi4_column_ID)
+#             temp_end_coords = row['local_plane_coords'][temp_index]
+#             temp_start_coords = row['home_dot_coords']
+#         except:
+#             # Vectors with no length should not be considered.
+#             temp_end_coords = row['home_dot_coords']
+#             temp_start_coords = row['home_dot_coords']
+#             angles.append(None)
+#             continue  # Skip to the next row
+
+#         # Fit the reference line and get the equator vector coordinates
+#         x_plane, y_plane, x_home, y_home, x_fit, y_fit, equator_vector, vector_start_coords, vector_end_coords = fit_reference_line_to_plane(df, row['column_id'])
+
+#         # Calculate the given vector's angle
+#         x_start = temp_start_coords[0]
+#         y_start = temp_start_coords[1]
+#         x_end = temp_end_coords[0]
+#         y_end = temp_end_coords[1]
+
+#         dx_vector = x_end - x_start
+#         dy_vector = y_end - y_start
+
+#         vector_angle_rad = np.arctan2(dy_vector, dx_vector)
+
+#         # Calculate the equator vector's angle
+#         x_eq_start = vector_start_coords[0]
+#         y_eq_start = vector_start_coords[1]
+#         x_eq_end = vector_end_coords[0]
+#         y_eq_end = vector_end_coords[1]
+
+#         dx_equator = x_eq_end - x_eq_start
+#         dy_equator = y_eq_end - y_eq_start
+
+#         equator_angle_rad = np.arctan2(dy_equator, dx_equator)
+
+#         # Calculate the angle difference between the two vectors
+#         angle_difference_rad = vector_angle_rad - equator_angle_rad
+
+#         # Convert the angle to degrees
+#         angle_difference_deg = np.degrees(angle_difference_rad)
+
+#         # Normalize the angle to the range [0, 360) degrees
+#         angle_difference_deg = (angle_difference_deg + 360) % 360
+#         angle_difference_deg = round(angle_difference_deg)  # rounding angle's values
+
+#         # Append the result to the angles list
+#         angles.append(angle_difference_deg)
+    
+#     # Updating the main data frame with angles
+#     df[f'BL_angle'] = angles
+
+#     return df  # Returning the modified DataFrame
+
+import numpy as np
+
+def calculate_bl_angles_to_equator_vector(df, columns_id_data):
+    angles = []
+    cosine_ls = []
+    sine_ls = []
+    move_to_positive = 200000
+
+    
+    # Iterate over each row in the dataframe
+    for idx, row in df.iterrows():
+        # IDs for Mi4 and Mi1
+        temp_Mi4_cell_ID = row['Mi4_ID']
+        temp_Mi1_cell_ID = row['Mi1_ID']
+
+        # Get column IDs using the 'columns_id_data' DataFrame
+        temp_Mi4_column_ID = columns_id_data[columns_id_data['root_id'] == temp_Mi4_cell_ID]['column_id'].tolist()[0]
+        temp_Mi1_column_ID = columns_id_data[columns_id_data['root_id'] == temp_Mi1_cell_ID]['column_id'].tolist()[0]
+
+        # Vector Start and End coordinates (Home Dot and Mi4 Nearest Neighbor)
+        temp_neighbors_ls = row['nearest_neighbours']
+        try:
+            temp_index = temp_neighbors_ls.index(temp_Mi4_column_ID)
+            temp_end_coords = row['local_plane_coords'][temp_index]
+            temp_start_coords = row['home_dot_coords']
+        except:
+            # Vectors with no length should not be considered.
+            temp_end_coords = row['home_dot_coords']
+            temp_start_coords = row['home_dot_coords']
+            angles.append(None)
+            cosine_ls.append(None)
+            sine_ls.append(None)
+            continue  # Skip to the next row
+
+        # Fit the reference line and get the equator vector coordinates
+        x_plane, y_plane, x_home, y_home, x_fit, y_fit, equator_vector, vector_start_coords, vector_end_coords = fit_reference_line_to_plane(df, row['column_id'])
+
+        # Given vector: from temp_start_coords to temp_end_coords
+        dx_vector = (temp_end_coords[0]+move_to_positive) - (temp_start_coords[0]+move_to_positive)
+        dy_vector = (temp_end_coords[1]+move_to_positive) - (temp_start_coords[1]+move_to_positive)
+
+        # Equator vector: from vector_start_coords to vector_end_coords
+        dx_equator = (vector_end_coords[0]+move_to_positive) - (vector_start_coords[0]+move_to_positive)
+        dy_equator = (vector_end_coords[1]+move_to_positive) - (vector_start_coords[1]+move_to_positive)
+
+        # Calculate the cross product (scalar in 2D) and dot product
+        cross_product = (dx_vector * dy_equator) - (dy_vector * dx_equator)
+        dot_product = (dx_vector * dx_equator) + (dy_vector * dy_equator)
+
+        
+        # Calculate the angle in radians using arctan2 of cross and dot products
+        angle_rad = np.arctan2(cross_product, dot_product)
+
+        # Convert to degrees
+        angle_deg = np.degrees(angle_rad)
+
+        # Normalize the angle to the range [0, 360] degrees
+        angle_deg = (angle_deg + 360) % 360
+        angle_deg = round(angle_deg)  # rounding angle's values
+
+        # #### Luisa's option instead of using np.arctan2
+        # # Calculate cosine and sine of the angle between vectors
+        # _cosine = dot_product/(np.sqrt(dx_vector**2 +dy_vector**2) * np.sqrt(dx_equator**2 +dy_equator**2))
+        # cosine_ls.append(_cosine)
+
+        # _sine = cross_product/(np.sqrt(dx_vector**2 +dy_vector**2) * np.sqrt(dx_equator**2 +dy_equator**2))
+        # sine_ls.append(_sine)
+
+        # #Get the angle with arccos.
+        # angle_rad = np.arccos(_cosine)
+        # if _sine < 0:
+        #     angle_rad += np.pi
+        # # Convert to degrees
+        # angle_deg = np.degrees(angle_rad)
+
+
+        # Append the result to the angles list
+        angles.append(angle_deg)
+    
+    # Updating the main data frame with angles
+    df['BL_angle'] = angles
+    #df['Cosine'] = cosine_ls
+    #df['Sine'] = sine_ls
+
+    return df  # Returning the modified DataFrame
+
+
 
 
 #%% Plotting functions
@@ -1251,6 +1543,39 @@ def color_polygons_reference_equators(df_grid, polygons, reference_axes_dict, ma
     
     for i in range(x_steps):
         h_x_ls = [x + 1 for x in h_x_ls]
+        # Coloring the hexagons
+        h = list(zip(h_x_ls, h_y_ls))
+        
+        if map_type == 'regular':
+            # h = eye's equator
+            color = colors[i]  # Pick the color for this iteration
+            
+            for h_x, h_y in h:
+                color_in_p = h_x
+                color_in_q = h_y
+                for polygon, (x_pos, y_pos) in zip(polygons, zip(original_p, original_q)):
+                    if x_pos == color_in_p and y_pos == color_in_q:
+                        polygon.set_facecolor(color)  # Apply the color from the palette
+
+
+def color_polygons_reference_meridians(df_grid, polygons, reference_axes_dict, map_type, y_start=-30, y_steps=50):
+    """
+    Add Docstring once the function is complete
+    """
+    import matplotlib.colors as mcolors
+    # Needed variables
+    original_p = df_grid.p.tolist()
+    original_q = df_grid.q.tolist()
+    h_x_ls = reference_axes_dict['h_x_ls']
+    h_y_ls = reference_axes_dict['h_y_ls']
+    h_y_ls = [y + y_start for y in h_y_ls]
+    
+    # Create a yellow color palette with 60 shades
+    cmap = plt.get_cmap('Greens', y_steps)  # 'Greens' is a colormap
+    colors = [mcolors.to_hex(cmap(i)) for i in range(y_steps)]  # Generate hex colors for each step
+    
+    for i in range(y_steps):
+        h_y_ls = [y + 1 for y in h_y_ls]
         # Coloring the hexagons
         h = list(zip(h_x_ls, h_y_ls))
         
