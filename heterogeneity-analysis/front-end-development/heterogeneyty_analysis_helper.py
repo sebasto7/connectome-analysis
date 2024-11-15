@@ -12,7 +12,7 @@ Clean code for publication
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr, levene
+from scipy.stats import pearsonr, levene,PermutationMethod
 from itertools import combinations
 import math
 
@@ -209,7 +209,7 @@ def calculate_correlation_and_p_values(df):
 
     for col1, col2 in combinations(df.columns, 2):
         x_data, y_data = df[col1], df[col2]
-        correlation_coefficient, p_value = pearsonr(x_data, y_data)
+        correlation_coefficient, p_value = pearsonr(x_data, y_data, method=PermutationMethod()) 
         correlation_df.at[col1, col2] = correlation_coefficient
         correlation_df.at[col2, col1] = correlation_coefficient
         p_value_corrected = min(p_value * num_comparisons, 1.0)
