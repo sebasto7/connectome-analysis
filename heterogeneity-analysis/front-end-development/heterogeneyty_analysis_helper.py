@@ -192,9 +192,63 @@ def permutation_test(cluster_df, dataset_df, column1_name, column2_name, num_per
 
     return observed_corr, p_value, shuffled_corrs
 
+import pandas as pd
+import numpy as np
+from scipy.stats import pearsonr
+from itertools import combinations
+
+def calculate_correlation_and_p_values_BH_correction(df):
+    """
+    Calculate the Pearson correlation coefficients and Benjamini-Hochberg corrected p-values for all pairs of columns.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data for correlation analysis.
+
+    Returns:
+        tuple: DataFrames containing the correlation coefficients and the Benjamini-Hochberg corrected p-values.
+    """
+    correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
+    p_values_correlation_df = pd.DataFrame(columns=df.columns, index=df.columns)
+    all_p_values = []
+    comparisons = list(combinations(df.columns, 2))
+
+    # Step 1: Calculate correlations and store raw p-values
+    for col1, col2 in comparisons:
+        x_data, y_data = df[col1], df[col2]
+        correlation_coefficient, p_value = pearsonr(x_data, y_data, method=PermutationMethod())
+        correlation_df.at[col1, col2] = correlation_coefficient
+        correlation_df.at[col2, col1] = correlation_coefficient
+        all_p_values.append(p_value)
+        p_values_correlation_df.at[col1, col2] = p_value
+        p_values_correlation_df.at[col2, col1] = p_value
+
+    np.fill_diagonal(correlation_df.values, 1.0)
+
+    # Step 2: Apply Benjamini-Hochberg correction
+    all_p_values = np.array(all_p_values)
+    m = len(all_p_values)  # Total number of comparisons
+    sorted_indices = np.argsort(all_p_values)
+    sorted_p_values = all_p_values[sorted_indices]
+    bh_adjusted = np.zeros(m)
+
+    for i, p_val in enumerate(sorted_p_values):
+        bh_adjusted[i] = min(p_val * m / (i + 1), 1.0)  # Adjust and cap at 1.0
+
+    # Step 3: Restore the original order of the adjusted p-values
+    bh_adjusted_corrected = np.zeros(m)
+    bh_adjusted_corrected[sorted_indices] = bh_adjusted
+
+    # Step 4: Fill the p-value matrix with adjusted p-values
+    for idx, (col1, col2) in enumerate(comparisons):
+        corrected_p_value = round(bh_adjusted_corrected[idx], 4)
+        p_values_correlation_df.at[col1, col2] = corrected_p_value
+        p_values_correlation_df.at[col2, col1] = corrected_p_value
+
+    return correlation_df, p_values_correlation_df
+
 
 def calculate_correlation_and_p_values(df):
-    """
+    """lu
     Calculate the Pearson correlation coefficients and Bonferroni-corrected p-values for all pairs of columns.
 
     Args:
