@@ -274,7 +274,6 @@ def calculate_correlation_and_p_values(df):
 
     return correlation_df, p_values_correlation_df
 
-
 def cosine_similarity_and_clustering(_data, cosine_subgroups):
     """
     Perform cosine similarity analysis and hierarchical clustering on the given data.
@@ -291,57 +290,154 @@ def cosine_similarity_and_clustering(_data, cosine_subgroups):
     from sklearn.metrics.pairwise import cosine_similarity
     from scipy.cluster import hierarchy
 
+    # Drop rows with all NaN values
     dropped_indexes = []
     kept_indexes = []
     dropped_data = _data.dropna(how='all', inplace=False)
     dropped_indexes.extend(list(set(_data.index) - set(dropped_data.index)))
     kept_indexes.extend(dropped_data.index)
-    print(f'Dropping {len(dropped_indexes)} Tm9 columns with no data during cosine_sim analysis')
+    print(f"Dropping {len(dropped_indexes)} rows with no data during cosine_sim analysis")
+
     _data.dropna(how='all', inplace=True)
 
+    if _data.empty:
+        raise ValueError("The input DataFrame is empty after removing rows with all NaN values.")
+
+    # Create subgroup data
     subgroup_data = {}
     for subgroup in cosine_subgroups:
-        subgroup_data[subgroup] = _data[_data.index.str.contains(subgroup)]
+        subgroup_df = _data[_data.index.str.contains(subgroup)]
+        if subgroup_df.empty:
+            raise ValueError(f"No data found for subgroup '{subgroup}'. Check the input DataFrame or filtering condition.")
+        subgroup_data[subgroup] = subgroup_df
 
+    # Calculate cosine similarity within subgroups
     cos_sim_within = {}
     cos_sim_within_medians = {}
     for subgroup, subgroup_df in subgroup_data.items():
-        cos_sim_within[subgroup] = cosine_similarity(subgroup_df.fillna(0))
-        cos_sim_within_medians[subgroup] = list(np.round(np.nanmedian(cos_sim_within[subgroup], 1), 2))
+        if not subgroup_df.empty:
+            cos_sim_within[subgroup] = cosine_similarity(subgroup_df.fillna(0))
+            cos_sim_within_medians[subgroup] = list(np.round(np.nanmedian(cos_sim_within[subgroup], axis=1), 2))
+        else:
+            cos_sim_within[subgroup] = np.array([])
+            cos_sim_within_medians[subgroup] = []
 
-    cos_sim_between = cosine_similarity(subgroup_data[cosine_subgroups[0]].fillna(0), subgroup_data[cosine_subgroups[1]].fillna(0))
-    cos_sim_between_medians = list(np.round(np.nanmedian(cos_sim_between, 1), 2))
+    # Calculate cosine similarity between subgroups
+    cos_sim_between = cosine_similarity(
+        subgroup_data[cosine_subgroups[0]].fillna(0), 
+        subgroup_data[cosine_subgroups[1]].fillna(0)
+    )
+    cos_sim_between_medians = list(np.round(np.nanmedian(cos_sim_between, axis=1), 2))
 
+    # Combine cosine similarity medians
     cos_sim_medians = cos_sim_within_medians
     cos_sim_medians[''.join(cosine_subgroups)] = cos_sim_between_medians
 
+    # Fill remaining NaN values in the entire dataset
     _data.fillna(0, inplace=True)
 
+    # Calculate full cosine similarity
     cosine_sim = cosine_similarity(_data.values)
     cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
 
+    # Extract features for summary
     hemisphere_list = [index_name.split(':')[2][0] for index_name in _data.index]
     d_v_list = [index_name.split(':')[3] for index_name in _data.index]
     cell_type_list = [index_name.split(':')[0] for index_name in _data.index]
 
-    cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere','neuron'],
-                                         index=_data.index.tolist())
-    cosine_sim_nan = np.where(cosine_sim == 1., np.nan, cosine_sim)
-    cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2)
-    cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
-    cosine_sim_summary_df['hemisphere'] = hemisphere_list
-    cosine_sim_summary_df['dorso-ventral'] = d_v_list
-    cosine_sim_summary_df['neuron'] = cell_type_list
+    # Create cosine similarity summary DataFrame
+    cosine_sim_summary_df = pd.DataFrame({
+        'cosine_sim': np.round(np.nanmedian(np.where(cosine_sim == 1., np.nan, cosine_sim), axis=1), 2),
+        'dorso-ventral': d_v_list,
+        'hemisphere': hemisphere_list,
+        'neuron': cell_type_list
+    }, index=_data.index)
 
+    # Perform hierarchical clustering
     dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
     cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
 
+    # Reorder the data based on clustering
     _data_reordered_cosine_sim = _data.iloc[cosine_row_order].copy()
-
     cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim.values)
-    cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered,
-                                           index=_data_reordered_cosine_sim.index,
-                                           columns=_data_reordered_cosine_sim.index)
+    cosine_sim_reordered_df = pd.DataFrame(
+        cosine_sim_reordered,
+        index=_data_reordered_cosine_sim.index,
+        columns=_data_reordered_cosine_sim.index
+    )
 
     return (cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, 
             cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered, cos_sim_medians)
+
+
+
+# def cosine_similarity_and_clustering(_data, cosine_subgroups):
+#     """
+#     Perform cosine similarity analysis and hierarchical clustering on the given data.
+
+#     Args:
+#         _data (pd.DataFrame): The DataFrame containing the data for analysis.
+#         cosine_subgroups (list of str): List of subgroups to calculate cosine similarity within and between.
+
+#     Returns:
+#         tuple: DataFrames for cosine similarity, summary, reordered data, and other clustering results.
+#     """
+#     import numpy as np
+#     import pandas as pd
+#     from sklearn.metrics.pairwise import cosine_similarity
+#     from scipy.cluster import hierarchy
+
+#     dropped_indexes = []
+#     kept_indexes = []
+#     dropped_data = _data.dropna(how='all', inplace=False)
+#     dropped_indexes.extend(list(set(_data.index) - set(dropped_data.index)))
+#     kept_indexes.extend(dropped_data.index)
+#     print(f'Dropping {len(dropped_indexes)} Tm9 columns with no data during cosine_sim analysis')
+#     _data.dropna(how='all', inplace=True)
+
+#     subgroup_data = {}
+#     for subgroup in cosine_subgroups:
+#         subgroup_data[subgroup] = _data[_data.index.str.contains(subgroup)]
+
+#     cos_sim_within = {}
+#     cos_sim_within_medians = {}
+#     for subgroup, subgroup_df in subgroup_data.items():
+#         cos_sim_within[subgroup] = cosine_similarity(subgroup_df.fillna(0))
+#         cos_sim_within_medians[subgroup] = list(np.round(np.nanmedian(cos_sim_within[subgroup], 1), 2))
+
+#     cos_sim_between = cosine_similarity(subgroup_data[cosine_subgroups[0]].fillna(0), subgroup_data[cosine_subgroups[1]].fillna(0))
+#     cos_sim_between_medians = list(np.round(np.nanmedian(cos_sim_between, 1), 2))
+
+#     cos_sim_medians = cos_sim_within_medians
+#     cos_sim_medians[''.join(cosine_subgroups)] = cos_sim_between_medians
+
+#     _data.fillna(0, inplace=True)
+
+#     cosine_sim = cosine_similarity(_data.values)
+#     cosine_sim_df = pd.DataFrame(cosine_sim, index=_data.index, columns=_data.index)
+
+#     hemisphere_list = [index_name.split(':')[2][0] for index_name in _data.index]
+#     d_v_list = [index_name.split(':')[3] for index_name in _data.index]
+#     cell_type_list = [index_name.split(':')[0] for index_name in _data.index]
+
+#     cosine_sim_summary_df = pd.DataFrame(columns=['cosine_sim', 'dorso-ventral', 'hemisphere','neuron'],
+#                                          index=_data.index.tolist())
+#     cosine_sim_nan = np.where(cosine_sim == 1., np.nan, cosine_sim)
+#     cosine_sim_list = np.round(np.nanmedian(cosine_sim_nan, 1), 2)
+#     cosine_sim_summary_df['cosine_sim'] = cosine_sim_list
+#     cosine_sim_summary_df['hemisphere'] = hemisphere_list
+#     cosine_sim_summary_df['dorso-ventral'] = d_v_list
+#     cosine_sim_summary_df['neuron'] = cell_type_list
+
+#     dendrogram_cosine = hierarchy.linkage(cosine_sim, method='ward')
+#     cosine_row_order = hierarchy.leaves_list(dendrogram_cosine)
+
+#     _data_reordered_cosine_sim = _data.iloc[cosine_row_order].copy()
+
+#     cosine_sim_reordered = cosine_similarity(_data_reordered_cosine_sim.values)
+#     cosine_sim_reordered_df = pd.DataFrame(cosine_sim_reordered,
+#                                            index=_data_reordered_cosine_sim.index,
+#                                            columns=_data_reordered_cosine_sim.index)
+
+#     return (cosine_sim_df, cosine_sim_summary_df, cosine_row_order, dendrogram_cosine, 
+#             cosine_sim_reordered_df, _data_reordered_cosine_sim, cosine_sim, cosine_sim_reordered, cos_sim_medians)
